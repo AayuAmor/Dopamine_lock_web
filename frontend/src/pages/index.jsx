@@ -55,13 +55,13 @@ import {
   futureFeatures,
   goals,
   monthlyReview,
-  sessions,
   streakDays,
   weeklyReview,
 } from '../data/mockData'
 import { useBlockManager } from '../hooks/useBlockManager'
 import { useMissions } from '../hooks/useMissions'
 import { useMissionSession } from '../hooks/useMissionSession'
+import { useSessionHistory } from '../hooks/useSessionHistory'
 import {
   createRule,
   deleteRule as deleteBlockRule,
@@ -83,6 +83,7 @@ import {
   resumeMission,
   startMission,
 } from '../services/missionSessionService'
+import { getSession as getHistorySession } from '../services/sessionHistoryService'
 
 const missionRules = ['Strict mode', 'Block all notifications', 'Prevent tab switching']
 const blockCategories = [
@@ -109,6 +110,8 @@ const blockCategoryLabels = {
 }
 const missionFilters = ['All', 'Favorites', 'Archived', 'Easy', 'Medium', 'Hard']
 const missionSorts = ['Newest', 'Oldest', 'Alphabetical', 'Duration', 'Difficulty']
+const sessionFilters = ['All', 'Completed', 'Abandoned', 'Today', 'This Week', 'This Month']
+const sessionSorts = ['Newest', 'Oldest', 'Duration', 'Completion Time', 'Mission Name']
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const bioLimit = 500
 const avatarMaxSize = 2 * 1024 * 1024
@@ -199,6 +202,59 @@ function formatTime(value) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value))
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return 'Not set'
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function sessionTimelineGroup(value) {
+  if (!value) {
+    return 'Earlier'
+  }
+
+  const sessionDate = new Date(value)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  const weekStart = new Date()
+  weekStart.setHours(0, 0, 0, 0)
+  weekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1))
+
+  if (sessionDate.toDateString() === today.toDateString()) {
+    return 'Today'
+  }
+
+  if (sessionDate.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday'
+  }
+
+  if (sessionDate >= weekStart) {
+    return 'This Week'
+  }
+
+  return 'Earlier'
+}
+
+function sessionCardFromHistory(session) {
+  return {
+    id: session.id,
+    date: sessionTimelineGroup(session.endedAt),
+    duration: `${session.actualDurationMinutes || Math.round(session.elapsedSeconds / 60)} min`,
+    status: session.status === 'COMPLETED' ? 'Completed' : 'Abandoned',
+    time: `${formatTime(session.startedAt)} - ${formatTime(session.endedAt)}`,
+    title: session.mission?.title || 'Untitled Mission',
+    xp: `${session.completionPercentage}%`,
+  }
 }
 
 function parseList(value) {
@@ -411,6 +467,7 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { effectiveRules, presets } = useBlockManager()
+  const { history: recentHistory } = useSessionHistory({ limit: 3, page: 1, sort: 'Newest' })
   const { missions: userMissions } = useMissions()
   const { session: currentSession } = useMissionSession()
   const readyMission = userMissions.find((mission) => mission.status === 'Ready' && !mission.archived)
@@ -463,7 +520,11 @@ export function DashboardPage() {
         </div>
       </Card>
       <Card title="Recent Sessions" label="Last activity">
-        <div className="list-stack">{sessions.slice(0, 3).map((session) => <SessionCard key={session.id} session={session} />)}</div>
+        <div className="list-stack">
+          {recentHistory.items.map((session) => <SessionCard key={session.id} session={sessionCardFromHistory(session)} />)}
+          {recentHistory.items.length === 0 && <p className="muted-text">No completed or abandoned sessions yet.</p>}
+          <Button variant="secondary" onClick={() => navigate('/session-history')}>View All</Button>
+        </div>
       </Card>
     </>
   )
@@ -473,6 +534,7 @@ export function ProfilePage() {
   const { refreshProfile, updateProfile, uploadAvatar, user } = useAuth()
   const { missions: userMissions } = useMissions()
   const { session: currentSession } = useMissionSession()
+  const { summary: sessionSummary } = useSessionHistory({ limit: 1, page: 1 })
   const fileInputRef = useRef(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -667,6 +729,9 @@ export function ProfilePage() {
               <ProfileDetail label="Discipline Title" value={user?.disciplineTitle} />
               <ProfileDetail label="Bio" value={user?.bio || 'No bio set'} />
               <ProfileDetail label="Total Missions Created" value={userMissions.length} />
+              <ProfileDetail label="Total Sessions" value={sessionSummary?.totalSessions || 0} />
+              <ProfileDetail label="Completed Sessions" value={sessionSummary?.completedSessions || 0} />
+              <ProfileDetail label="Average Focus Time" value={formatDuration(sessionSummary?.averageSessionDuration || 0)} />
               <ProfileDetail label="Current Active Mission" value={currentSession?.mission?.title || 'No active mission'} />
               <ProfileDetail label="Current Session Duration" value={currentSession ? formatDuration(currentSession.elapsedSeconds) : '0m'} />
               <ProfileDetail label="Daily Goal" value={`${user?.dailyFocusGoal || 4} hours`} />
@@ -1465,42 +1530,109 @@ function WebsiteList({ items, danger, onDelete, onToggle }) {
 
 export function SessionHistoryPage() {
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('All')
-  const filtered = sessions.filter((session) => {
-    const matchesQuery = session.title.toLowerCase().includes(query.toLowerCase())
-    const matchesStatus = status === 'All' || session.status === status
-    return matchesQuery && matchesStatus
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [filter, setFilter] = useState('All')
+  const [page, setPage] = useState(1)
+  const [selectedSession, setSelectedSession] = useState(null)
+  const [sort, setSort] = useState('Newest')
+  const [error, setError] = useState('')
+  const {
+    error: loadError,
+    history,
+    isLoading,
+    summary,
+  } = useSessionHistory({
+    filter,
+    limit: 10,
+    page,
+    search: debouncedQuery,
+    sort,
   })
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedQuery(query)
+      setPage(1)
+    }, 350)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [query])
+
   const grouped = useMemo(
     () =>
-      filtered.reduce((groups, session) => {
-        groups[session.date] = [...(groups[session.date] || []), session]
+      history.items.reduce((groups, session) => {
+        const group = sessionTimelineGroup(session.endedAt)
+        groups[group] = [...(groups[group] || []), session]
         return groups
       }, {}),
-    [filtered],
+    [history.items],
   )
+
+  const handleSelectSession = async (sessionId) => {
+    try {
+      setError('')
+      setSelectedSession(await getHistorySession(sessionId))
+    } catch (selectError) {
+      setError(selectError.message)
+    }
+  }
 
   return (
     <>
       <PageHeader eyebrow="Session History" title="Audit Focus Sessions" description="Search the timeline and inspect completion quality." />
+      {(error || loadError) && <p className="form-error">{error || loadError}</p>}
       <div className="stats-grid">
-        <StatCard label="Completed" value="42" meta="Last 30 days" icon={CheckCircle2} />
-        <StatCard label="Failed" value="7" meta="Requires review" icon={Ban} />
-        <StatCard label="Discipline XP" value="4,820" meta="Total earned" icon={Trophy} />
+        <StatCard label="Total Focus Hours" value={`${summary?.totalFocusHours || 0}h`} meta="Historical total" icon={Clock} />
+        <StatCard label="Total Sessions" value={summary?.totalSessions || 0} meta={`${summary?.currentWeekSessions || 0} this week`} icon={Target} />
+        <StatCard label="Success Rate" value={`${summary?.successRate || 0}%`} meta={`${summary?.completedSessions || 0} completed`} icon={CheckCircle2} />
+        <StatCard label="Average Duration" value={formatDuration(summary?.averageSessionDuration || 0)} meta="Per session" icon={Trophy} />
       </div>
       <div className="toolbar">
         <Input label="Search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sessions" />
-        <Select label="Filters" value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option>All</option>
-          <option>Completed</option>
-          <option>Failed</option>
+        <Select label="Filters" value={filter} onChange={(event) => { setFilter(event.target.value); setPage(1) }}>
+          {sessionFilters.map((item) => <option key={item}>{item}</option>)}
+        </Select>
+        <Select label="Sort" value={sort} onChange={(event) => { setSort(event.target.value); setPage(1) }}>
+          {sessionSorts.map((item) => <option key={item}>{item}</option>)}
         </Select>
       </div>
       {Object.entries(grouped).map(([date, dateSessions]) => (
         <Card title={date} label="Timeline grouped by date" key={date}>
-          <div className="list-stack">{dateSessions.map((session) => <SessionCard key={session.id} session={session} />)}</div>
+          <div className="list-stack">
+            {dateSessions.map((session) => (
+              <div className="compact-row" key={session.id}>
+                <SessionCard session={sessionCardFromHistory(session)} />
+                <Button variant="secondary" onClick={() => handleSelectSession(session.id)}>Details</Button>
+              </div>
+            ))}
+          </div>
         </Card>
       ))}
+      {!isLoading && history.items.length === 0 && (
+        <Card title="No Sessions" label="History"><p className="muted-text">No completed or abandoned sessions match this view.</p></Card>
+      )}
+      <div className="splash-actions">
+        <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
+        <Badge label={`Page ${history.page} / ${history.totalPages}`} />
+        <Button variant="secondary" disabled={page >= history.totalPages} onClick={() => setPage((current) => current + 1)}>Next</Button>
+      </div>
+      {selectedSession && (
+        <Card title="Session Details" label={selectedSession.status}>
+          <div className="profile-details">
+            <ProfileDetail label="Mission Name" value={selectedSession.mission?.title} />
+            <ProfileDetail label="Goal" value={selectedSession.mission?.goal} />
+            <ProfileDetail label="Description" value={selectedSession.mission?.description || 'No description'} />
+            <ProfileDetail label="Duration" value={`${selectedSession.plannedDurationMinutes || selectedSession.mission?.durationMinutes || 0} minutes planned`} />
+            <ProfileDetail label="Actual Duration" value={`${selectedSession.actualDurationMinutes || Math.round(selectedSession.elapsedSeconds / 60)} minutes`} />
+            <ProfileDetail label="Completion Status" value={selectedSession.status} />
+            <ProfileDetail label="Blocked Websites" value={(selectedSession.mission?.blockedWebsites || []).join(', ') || 'None'} />
+            <ProfileDetail label="Started At" value={formatDateTime(selectedSession.startedAt)} />
+            <ProfileDetail label="Ended At" value={formatDateTime(selectedSession.endedAt)} />
+            <ProfileDetail label="Completion Reason" value={selectedSession.completionReason || 'Not set'} />
+            <ProfileDetail label="Notes" value={selectedSession.notes || 'No notes'} />
+          </div>
+        </Card>
+      )}
     </>
   )
 }

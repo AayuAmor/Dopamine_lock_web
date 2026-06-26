@@ -8,6 +8,7 @@ const blockManagerRoutes = require('./src/routes/blockManagerRoutes')
 const missionSessionRoutes = require('./src/routes/missionSessionRoutes')
 const missionRoutes = require('./src/routes/missionRoutes')
 const profileRoutes = require('./src/routes/profileRoutes')
+const sessionHistoryRoutes = require('./src/routes/sessionHistoryRoutes')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -42,6 +43,7 @@ app.use('/api/block-manager', blockManagerRoutes)
 app.use('/api/mission-session', missionSessionRoutes)
 app.use('/api/missions', missionRoutes)
 app.use('/api/profile', profileRoutes)
+app.use('/api/session-history', sessionHistoryRoutes)
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` })

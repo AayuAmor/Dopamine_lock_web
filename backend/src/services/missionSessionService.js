@@ -49,11 +49,18 @@ function formatSession(session, now = new Date()) {
     missionId: session.missionId,
     startedAt: session.startedAt,
     endedAt: session.endedAt,
+    completedAt: session.completedAt,
     pausedAt: session.pausedAt,
     totalPausedSeconds: session.totalPausedSeconds,
     elapsedSeconds: timing.elapsedSeconds,
     remainingSeconds: timing.remainingSeconds,
     completionPercentage: timing.completionPercentage,
+    actualDurationMinutes: session.actualDurationMinutes,
+    plannedDurationMinutes: session.plannedDurationMinutes,
+    focusPercentage: session.focusPercentage,
+    interruptionCount: session.interruptionCount,
+    blockedWebsitesCount: session.blockedWebsitesCount,
+    completionReason: session.completionReason,
     estimatedFinishAt: timing.estimatedFinishAt,
     serverNow: now,
     status: session.status,
@@ -242,15 +249,23 @@ async function completeCurrentSession(userId, notes) {
 
   const now = new Date()
   const timing = calculateSessionTiming(session, now)
+  const plannedDurationMinutes = session.mission.durationMinutes
+  const actualDurationMinutes = Math.max(1, Math.round(timing.elapsedSeconds / 60))
   const updatedSession = await prisma.$transaction(async (tx) => {
     const completedSession = await tx.missionSession.update({
       where: { id: session.id },
       data: {
+        actualDurationMinutes,
+        blockedWebsitesCount: (session.mission.blockedWebsites || []).length,
+        completedAt: now,
         completed: true,
+        completionReason: 'Completed by user',
         completionPercentage: 100,
         elapsedSeconds: timing.elapsedSeconds,
         endedAt: now,
+        focusPercentage: 100,
         notes: notes || session.notes,
+        plannedDurationMinutes,
         remainingSeconds: 0,
         status: 'COMPLETED',
       },
@@ -280,16 +295,23 @@ async function abandonCurrentSession(userId, notes) {
 
   const now = new Date()
   const timing = calculateSessionTiming(session, now)
+  const plannedDurationMinutes = session.mission.durationMinutes
+  const actualDurationMinutes = Math.max(1, Math.round(timing.elapsedSeconds / 60))
   const updatedSession = await prisma.$transaction(async (tx) => {
     const abandonedSession = await tx.missionSession.update({
       where: { id: session.id },
       data: {
         abandoned: true,
+        actualDurationMinutes,
+        blockedWebsitesCount: (session.mission.blockedWebsites || []).length,
+        completionReason: 'Abandoned by user',
         completionPercentage: timing.completionPercentage,
         elapsedSeconds: timing.elapsedSeconds,
         endedAt: now,
+        focusPercentage: timing.completionPercentage,
         notes: notes || session.notes,
         pausedAt: null,
+        plannedDurationMinutes,
         remainingSeconds: timing.remainingSeconds,
         status: 'ABANDONED',
       },
