@@ -6,6 +6,7 @@ const avatarUploadDir = path.join(__dirname, '..', '..', 'uploads', 'avatars')
 const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp'])
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
+// Runtime avatar storage; this boundary can later be replaced by Cloudinary, AWS S3, or Google Cloud Storage.
 fs.mkdirSync(avatarUploadDir, { recursive: true })
 
 const storage = multer.diskStorage({
