@@ -23,6 +23,7 @@ import {
   Video,
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
+import { getAssetUrl } from '../services/apiClient'
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: Home },
@@ -56,12 +57,23 @@ export function AppLayout({ children }) {
 }
 
 export function Sidebar() {
+  const { user } = useAuth()
+
   return (
     <aside className="sidebar">
       <NavLink className="brand-lock" to="/dashboard">
         <Shield size={22} />
         <span>Dopamine Lock</span>
       </NavLink>
+      {user && (
+        <NavLink className="sidebar-profile" to="/profile">
+          <UserAvatar user={user} size="sm" />
+          <div>
+            <strong>{user.fullName}</strong>
+            <span>{user.disciplineTitle || 'DISCIPLINED BUILDER'}</span>
+          </div>
+        </NavLink>
+      )}
       <nav className="nav-list" aria-label="Main navigation">
         {navItems.map(({ label, path, icon: Icon }) => (
           <NavLink key={path} className="nav-item" to={path}>
@@ -77,21 +89,48 @@ export function Sidebar() {
 export function Topbar() {
   const location = useLocation()
   const current = navItems.find((item) => item.path === location.pathname)
+  const title = current?.label || (location.pathname === '/profile' ? 'Profile' : 'Dopamine Lock')
   const { logout, user } = useAuth()
 
   return (
     <header className="topbar">
       <div>
         <p className="eyebrow">Control Center</p>
-        <h1>{current?.label || 'Dopamine Lock'}</h1>
+        <h1>{title}</h1>
       </div>
       <div className="topbar-status">
-        {user && <span className="topbar-user">{user.fullName}</span>}
+        {user && (
+          <NavLink className="topbar-profile" to="/profile">
+            <UserAvatar user={user} size="sm" />
+            <span className="topbar-user">{user.fullName}</span>
+          </NavLink>
+        )}
         <Badge label="Strict Mode" />
         <Button variant="secondary" onClick={logout}>Logout</Button>
       </div>
     </header>
   )
+}
+
+export function UserAvatar({ user, size = 'md' }) {
+  const initials = (user?.fullName || user?.email || 'DL')
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  if (user?.avatarUrl) {
+    return (
+      <img
+        className={`avatar avatar-${size}`}
+        src={getAssetUrl(user.avatarUrl)}
+        alt={`${user.fullName || 'User'} avatar`}
+      />
+    )
+  }
+
+  return <span className={`avatar avatar-${size}`}>{initials}</span>
 }
 
 export function PageHeader({ eyebrow, title, description, action }) {

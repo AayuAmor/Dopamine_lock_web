@@ -2,7 +2,9 @@ require('dotenv').config()
 
 const cors = require('cors')
 const express = require('express')
+const path = require('path')
 const authRoutes = require('./src/routes/authRoutes')
+const profileRoutes = require('./src/routes/profileRoutes')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -26,12 +28,14 @@ app.use(
   }),
 )
 app.use(express.json())
+app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads', 'avatars')))
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
 
 app.use('/api/auth', authRoutes)
+app.use('/api/profile', profileRoutes)
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` })

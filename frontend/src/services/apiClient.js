@@ -13,11 +13,24 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+export function getAssetUrl(path) {
+  if (!path || /^https?:\/\//i.test(path)) {
+    return path
+  }
+
+  try {
+    return `${new URL(API_BASE_URL).origin}${path}`
+  } catch {
+    return path
+  }
+}
+
 export async function apiRequest(path, options = {}) {
   const token = getToken()
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
+  const headers = { ...(options.headers || {}) }
+
+  if (options.body && !(options.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json'
   }
 
   if (token) {

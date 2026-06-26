@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getToken } from '../services/apiClient'
 import { getCurrentUser, loginUser, logoutUser, registerUser } from '../services/authService'
+import {
+  getProfile,
+  updateProfile as saveProfile,
+  uploadAvatar as uploadProfileAvatar,
+} from '../services/profileService'
 import { AuthContext } from './authContext'
 
 export function AuthProvider({ children }) {
@@ -40,27 +45,54 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  const login = useCallback(async (credentials) => {
+    const loggedInUser = await loginUser(credentials)
+    setUser(loggedInUser)
+    return loggedInUser
+  }, [])
+
+  const register = useCallback(async (payload) => {
+    const registeredUser = await registerUser(payload)
+    setUser(registeredUser)
+    return registeredUser
+  }, [])
+
+  const refreshProfile = useCallback(async () => {
+    const profile = await getProfile()
+    setUser(profile)
+    return profile
+  }, [])
+
+  const updateProfile = useCallback(async (payload) => {
+    const profile = await saveProfile(payload)
+    setUser(profile)
+    return profile
+  }, [])
+
+  const uploadAvatar = useCallback(async (file) => {
+    const profile = await uploadProfileAvatar(file)
+    setUser(profile)
+    return profile
+  }, [])
+
+  const logout = useCallback(() => {
+    logoutUser()
+    setUser(null)
+  }, [])
+
   const value = useMemo(
     () => ({
       user,
       isAuthenticated: Boolean(user),
       isLoading,
-      async login(credentials) {
-        const loggedInUser = await loginUser(credentials)
-        setUser(loggedInUser)
-        return loggedInUser
-      },
-      async register(payload) {
-        const registeredUser = await registerUser(payload)
-        setUser(registeredUser)
-        return registeredUser
-      },
-      logout() {
-        logoutUser()
-        setUser(null)
-      },
+      login,
+      register,
+      refreshProfile,
+      updateProfile,
+      uploadAvatar,
+      logout,
     }),
-    [isLoading, user],
+    [isLoading, login, logout, refreshProfile, register, updateProfile, uploadAvatar, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

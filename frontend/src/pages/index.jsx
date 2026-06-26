@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Activity,
@@ -38,6 +38,7 @@ import {
   Select,
   SessionCard,
   StatCard,
+  UserAvatar,
 } from '../components'
 import { useAuth } from '../context/useAuth'
 import {
@@ -59,6 +60,30 @@ import {
 const missionRules = ['Strict mode', 'Block all notifications', 'Prevent tab switching']
 const categories = ['Social', 'Video', 'Forums', 'News', 'Gaming', 'Shopping']
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const bioLimit = 500
+const avatarMaxSize = 2 * 1024 * 1024
+const avatarTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+function formatMemberSince(value) {
+  if (!value) {
+    return 'Member since unknown'
+  }
+
+  return `Member since ${new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(value))}`
+}
+
+function profileFormFromUser(user) {
+  return {
+    fullName: user?.fullName || '',
+    bio: user?.bio || '',
+    timezone: user?.timezone || 'Asia/Kathmandu',
+    dailyFocusGoal: user?.dailyFocusGoal || 4,
+    preferredMissionDuration: user?.preferredMissionDuration || 50,
+  }
+}
 
 function validateAuthFields(fields, requireName = false) {
   if (requireName && !fields.fullName.trim()) {
@@ -266,6 +291,257 @@ export function DashboardPage() {
         <div className="list-stack">{sessions.slice(0, 3).map((session) => <SessionCard key={session.id} session={session} />)}</div>
       </Card>
     </>
+  )
+}
+
+export function ProfilePage() {
+  const { refreshProfile, updateProfile, uploadAvatar, user } = useAuth()
+  const fileInputRef = useRef(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [form, setForm] = useState(() => profileFormFromUser(null))
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreview, setAvatarPreview] = useState('')
+
+  useEffect(() => {
+    refreshProfile().catch(() => setError('Unable to load profile'))
+  }, [refreshProfile])
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview)
+      }
+    }
+  }, [avatarPreview])
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const beginEdit = () => {
+    setForm(profileFormFromUser(user))
+    setIsEditing(true)
+    setError('')
+    setSuccess('')
+  }
+
+  const validateProfile = () => {
+    if (!form.fullName.trim()) {
+      return 'Name is required'
+    }
+
+    if (form.bio.length > bioLimit) {
+      return `Bio must be ${bioLimit} characters or fewer`
+    }
+
+    if (Number(form.dailyFocusGoal) <= 0) {
+      return 'Daily Goal must be a positive number'
+    }
+
+    if (Number(form.preferredMissionDuration) <= 0) {
+      return 'Preferred Mission Duration must be a positive number'
+    }
+
+    return ''
+  }
+
+  const handleSave = async () => {
+    const validationError = validateProfile()
+
+    if (validationError) {
+      setError(validationError)
+      setSuccess('')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      setError('')
+      const profile = await updateProfile({
+        fullName: form.fullName,
+        bio: form.bio,
+        timezone: form.timezone,
+        dailyFocusGoal: Number(form.dailyFocusGoal),
+        preferredMissionDuration: Number(form.preferredMissionDuration),
+      })
+      setSuccess('Profile updated')
+      setIsEditing(false)
+      setForm(profileFormFromUser(profile))
+    } catch (saveError) {
+      setError(saveError.message)
+      setSuccess('')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setIsEditing(false)
+    setError('')
+    setSuccess('')
+    setForm(profileFormFromUser(user))
+  }
+
+  const validateAvatarFile = (file) => {
+    if (!file) {
+      return 'Choose an image to upload'
+    }
+
+    if (!avatarTypes.has(file.type)) {
+      return 'Only JPG, JPEG, PNG, and WEBP images are allowed'
+    }
+
+    if (file.size > avatarMaxSize) {
+      return 'Avatar image must be 2MB or smaller'
+    }
+
+    return ''
+  }
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files?.[0]
+    const validationError = validateAvatarFile(file)
+
+    if (validationError) {
+      setAvatarFile(null)
+      setError(validationError)
+      setSuccess('')
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview)
+        setAvatarPreview('')
+      }
+      event.target.value = ''
+      return
+    }
+
+    const previewUrl = URL.createObjectURL(file)
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview)
+    }
+
+    setAvatarFile(file)
+    setAvatarPreview(previewUrl)
+    setError('')
+    setSuccess('')
+  }
+
+  const handleAvatarSave = async () => {
+    const validationError = validateAvatarFile(avatarFile)
+
+    if (validationError) {
+      setError(validationError)
+      setSuccess('')
+      return
+    }
+
+    try {
+      setIsUploadingAvatar(true)
+      setError('')
+      await uploadAvatar(avatarFile)
+      await refreshProfile()
+      setSuccess('Profile photo updated')
+      setAvatarFile(null)
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview)
+        setAvatarPreview('')
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    } catch (uploadError) {
+      setError(uploadError.message)
+      setSuccess('')
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  return (
+    <>
+      <section className="profile-hero">
+        <UserAvatar user={user} size="lg" />
+        <div>
+          <p className="eyebrow">User Profile</p>
+          <h2>{user?.fullName || 'Operator'}</h2>
+          <p>{user?.disciplineTitle || 'DISCIPLINED BUILDER'}</p>
+          <span>{formatMemberSince(user?.createdAt)}</span>
+        </div>
+        <Badge label="Current Status: Active" />
+      </section>
+
+      {(error || success) && (
+        <p className={error ? 'form-error' : 'form-success'}>{error || success}</p>
+      )}
+
+      <div className="content-grid split">
+        <Card
+          title="Profile Information"
+          label="Authenticated data"
+          action={!isEditing && <Button variant="secondary" onClick={beginEdit}>Edit Profile</Button>}
+        >
+          {!isEditing ? (
+            <div className="profile-details">
+              <ProfileDetail label="Full Name" value={user?.fullName} />
+              <ProfileDetail label="Email" value={user?.email} />
+              <ProfileDetail label="Discipline Title" value={user?.disciplineTitle} />
+              <ProfileDetail label="Bio" value={user?.bio || 'No bio set'} />
+              <ProfileDetail label="Daily Goal" value={`${user?.dailyFocusGoal || 4} hours`} />
+              <ProfileDetail label="Preferred Mission Duration" value={`${user?.preferredMissionDuration || 50} minutes`} />
+              <ProfileDetail label="Timezone" value={user?.timezone} />
+            </div>
+          ) : (
+            <div className="form-stack">
+              <Input label="Name" value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} />
+              <label className="field">
+                <span>Bio</span>
+                <textarea value={form.bio} maxLength={bioLimit} onChange={(event) => updateField('bio', event.target.value)} />
+              </label>
+              <Input label="Timezone" value={form.timezone} onChange={(event) => updateField('timezone', event.target.value)} />
+              <Input label="Daily Goal" type="number" min="1" value={form.dailyFocusGoal} onChange={(event) => updateField('dailyFocusGoal', event.target.value)} />
+              <Input label="Preferred Mission Duration" type="number" min="1" value={form.preferredMissionDuration} onChange={(event) => updateField('preferredMissionDuration', event.target.value)} />
+              <div className="splash-actions">
+                <Button onClick={handleSave} disabled={isSaving}>{isSaving ? 'Saving' : 'Save'}</Button>
+                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
+              </div>
+            </div>
+          )}
+        </Card>
+        <Card title="Profile Picture" label="Avatar">
+          <div className="profile-avatar-card">
+            <UserAvatar user={{ ...user, avatarUrl: avatarPreview || user?.avatarUrl }} size="lg" />
+            <input
+              ref={fileInputRef}
+              className="avatar-file-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleAvatarChange}
+            />
+            <div className="avatar-actions">
+              <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+                Upload Photo
+              </Button>
+              <Button onClick={handleAvatarSave} disabled={!avatarFile || isUploadingAvatar}>
+                {isUploadingAvatar ? 'Saving Avatar' : 'Save Avatar'}
+              </Button>
+            </div>
+            {avatarFile && <p className="muted-text">{avatarFile.name}</p>}
+          </div>
+        </Card>
+      </div>
+    </>
+  )
+}
+
+function ProfileDetail({ label, value }) {
+  return (
+    <div className="compact-row">
+      <span>{label}</span>
+      <strong>{value || 'Not set'}</strong>
+    </div>
   )
 }
 
@@ -702,12 +978,15 @@ function ReviewPage({ title, range, data, summary }) {
 }
 
 export function IdentityPage() {
+  const { user } = useAuth()
+
   return (
     <>
       <Card className="identity-card">
+        <UserAvatar user={user} size="lg" />
         <p className="eyebrow">Identity Title</p>
-        <strong>DISCIPLINED BUILDER</strong>
-        <p>"I do not negotiate with impulses during mission hours."</p>
+        <strong>{user?.disciplineTitle || 'DISCIPLINED BUILDER'}</strong>
+        <p>{user?.bio || '"I do not negotiate with impulses during mission hours."'}</p>
       </Card>
       <div className="stats-grid">
         <StatCard label="Mission Completed" value="124" icon={CheckCircle2} />
@@ -740,14 +1019,32 @@ export function BrowserExtensionPage() {
 }
 
 export function SettingsPage() {
+  const { user } = useAuth()
+
   return (
     <>
       <PageHeader eyebrow="Settings" title="Operating Defaults" description="General, notifications, focus rules, and account controls." />
+      <Card title="Profile" label="Authenticated user">
+        <div className="settings-profile">
+          <UserAvatar user={user} size="md" />
+          <div>
+            <h3>{user?.fullName || 'Operator'}</h3>
+            <p>{user?.email}</p>
+            <p>{user?.disciplineTitle || 'DISCIPLINED BUILDER'}</p>
+          </div>
+        </div>
+        <div className="review-grid compact-review">
+          <ReviewStatCard label="Daily Goal" value={`${user?.dailyFocusGoal || 4}h`} />
+          <ReviewStatCard label="Mission Duration" value={`${user?.preferredMissionDuration || 50}m`} />
+          <ReviewStatCard label="Timezone" value={user?.timezone || 'Asia/Kathmandu'} />
+          <ReviewStatCard label="Member Since" value={formatMemberSince(user?.createdAt).replace('Member since ', '')} />
+        </div>
+      </Card>
       <div className="content-grid split">
         <SettingsSection title="General" rows={['Dark mode', 'Start of week']} />
         <SettingsSection title="Notifications" rows={['Daily goal', 'Focus reminder interval']} />
         <SettingsSection title="Focus Rules" rows={['Pause mission on idle', 'Strict mode default']} />
-        <SettingsSection title="Account" rows={['Profile email', 'Export data']} />
+        <SettingsSection title="Account" rows={['Export data']} />
       </div>
     </>
   )

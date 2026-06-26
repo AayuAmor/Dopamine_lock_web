@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const prisma = require('../config/prisma')
+const { formatProfile } = require('../services/profileService')
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'
@@ -10,15 +11,7 @@ function normalizeEmail(email) {
 }
 
 function publicUser(user) {
-  return {
-    id: user.id,
-    fullName: user.fullName,
-    email: user.email,
-    avatarUrl: user.avatarUrl,
-    role: user.role,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  }
+  return formatProfile(user)
 }
 
 function signToken(user) {

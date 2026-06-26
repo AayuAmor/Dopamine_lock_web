@@ -16,6 +16,7 @@ import {
   LoginPage,
   MissionCenterPage,
   MonthlyReviewPage,
+  ProfilePage,
   RegisterPage,
   SessionHistoryPage,
   SettingsPage,
@@ -28,6 +29,7 @@ import './App.css'
 
 const dashboardRoutes = [
   { path: '/dashboard', element: <DashboardPage /> },
+  { path: '/profile', element: <ProfilePage /> },
   { path: '/mission-center', element: <MissionCenterPage /> },
   { path: '/active-mission', element: <ActiveMissionPage /> },
   { path: '/consumption-control', element: <ConsumptionControlPage /> },
