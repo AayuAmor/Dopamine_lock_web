@@ -32,14 +32,6 @@ export const analytics = {
   totalSessions: 124,
 }
 
-export const streakDays = [
-  'completed', 'completed', 'partial', 'completed', 'missed', 'completed', 'today',
-  'completed', 'completed', 'completed', 'partial', 'completed', 'completed', 'missed',
-  'completed', 'completed', 'completed', 'completed', 'partial', 'completed', 'completed',
-  'completed', 'missed', 'completed', 'completed', 'completed', 'today', 'partial',
-  'completed', 'completed', 'missed', 'completed', 'completed', 'partial', 'completed',
-]
-
 export const disciplineScore = {
   score: 812,
   rank: 'Operator III',

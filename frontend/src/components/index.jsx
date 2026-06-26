@@ -240,11 +240,16 @@ export function LineChartMock({ values }) {
 export function CalendarGrid({ days }) {
   return (
     <div className="calendar-grid">
-      {days.map((state, index) => (
-        <span key={`${state}-${index}`} className={`day day-${state}`}>
-          {index + 1}
+      {days.map((day, index) => {
+        const state = typeof day === 'string' ? day : day.state.toLowerCase().replace('_', '-')
+        const dayNumber = typeof day === 'string' ? index + 1 : day.dayNumber
+
+        return (
+        <span key={`${state}-${dayNumber}-${index}`} className={`day day-${state}`}>
+          {dayNumber}
         </span>
-      ))}
+        )
+      })}
     </div>
   )
 }

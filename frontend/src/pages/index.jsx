@@ -55,13 +55,13 @@ import {
   futureFeatures,
   goals,
   monthlyReview,
-  streakDays,
   weeklyReview,
 } from '../data/mockData'
 import { useBlockManager } from '../hooks/useBlockManager'
 import { useMissions } from '../hooks/useMissions'
 import { useMissionSession } from '../hooks/useMissionSession'
 import { useSessionHistory } from '../hooks/useSessionHistory'
+import { useStreak } from '../hooks/useStreak'
 import {
   createRule,
   deleteRule as deleteBlockRule,
@@ -470,6 +470,14 @@ export function DashboardPage() {
   const { history: recentHistory } = useSessionHistory({ limit: 3, page: 1, sort: 'Newest' })
   const { missions: userMissions } = useMissions()
   const { session: currentSession } = useMissionSession()
+  const [dashboardCalendarDate] = useState(() => {
+    const now = new Date()
+    return {
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+    }
+  })
+  const { summary: streakSummary } = useStreak(dashboardCalendarDate.month, dashboardCalendarDate.year)
   const readyMission = userMissions.find((mission) => mission.status === 'Ready' && !mission.archived)
   const activePresetCount = presets.filter((preset) => preset.enabled).length
 
@@ -490,6 +498,9 @@ export function DashboardPage() {
         <StatCard label="Active Blocked" value={effectiveRules?.blockedDomains?.length || 0} meta="Effective websites" icon={Ban} />
         <StatCard label="Allowed Websites" value={effectiveRules?.allowedDomains?.length || 0} meta="Effective access" icon={ShieldCheck} />
         <StatCard label="Active Presets" value={activePresetCount} meta={`${userMissions.length} missions created`} icon={Flame} />
+        <StatCard label="Current Streak" value={`${streakSummary?.currentStreak || 0} days`} meta={`Best: ${streakSummary?.bestStreak || 0}`} icon={Flame} />
+        <StatCard label="Completion Rate" value={`${streakSummary?.completionRate || 0}%`} meta="Tracked days" icon={Activity} />
+        <StatCard label="Next Milestone" value={streakSummary?.nextMilestone || 7} meta={`${streakSummary?.milestoneProgress || 0}% complete`} icon={Trophy} />
       </div>
       <div className="content-grid two-one">
         <Card title="Weekly Focus Chart" label="Hours locked">
@@ -502,6 +513,7 @@ export function DashboardPage() {
               {currentSession ? 'Continue Mission' : 'Start Mission'}
             </ActionLink>
             <ActionLink onClick={() => navigate('/mission-center')}>Mission Center</ActionLink>
+            <ActionLink onClick={() => navigate('/streak-calendar')}>Streak Calendar</ActionLink>
             {!currentSession && readyMission && <ActionLink onClick={() => navigate('/mission-center')}>Continue Editing</ActionLink>}
             <ActionLink onClick={() => navigate('/block-manager')}>Update Blocks</ActionLink>
           </div>
@@ -535,6 +547,14 @@ export function ProfilePage() {
   const { missions: userMissions } = useMissions()
   const { session: currentSession } = useMissionSession()
   const { summary: sessionSummary } = useSessionHistory({ limit: 1, page: 1 })
+  const [profileCalendarDate] = useState(() => {
+    const now = new Date()
+    return {
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+    }
+  })
+  const { summary: profileStreakSummary } = useStreak(profileCalendarDate.month, profileCalendarDate.year)
   const fileInputRef = useRef(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -732,6 +752,7 @@ export function ProfilePage() {
               <ProfileDetail label="Total Sessions" value={sessionSummary?.totalSessions || 0} />
               <ProfileDetail label="Completed Sessions" value={sessionSummary?.completedSessions || 0} />
               <ProfileDetail label="Average Focus Time" value={formatDuration(sessionSummary?.averageSessionDuration || 0)} />
+              <ProfileDetail label="Current Streak" value={`${profileStreakSummary?.currentStreak || 0} days`} />
               <ProfileDetail label="Current Active Mission" value={currentSession?.mission?.title || 'No active mission'} />
               <ProfileDetail label="Current Session Duration" value={currentSession ? formatDuration(currentSession.elapsedSeconds) : '0m'} />
               <ProfileDetail label="Daily Goal" value={`${user?.dailyFocusGoal || 4} hours`} />
@@ -1638,20 +1659,64 @@ export function SessionHistoryPage() {
 }
 
 export function StreakCalendarPage() {
+  const [calendarDate, setCalendarDate] = useState(() => {
+    const now = new Date()
+    return {
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+    }
+  })
+  const {
+    calendar,
+    error,
+    milestones,
+    summary,
+    weekly,
+  } = useStreak(calendarDate.month, calendarDate.year)
+  const monthLabel = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(calendarDate.year, calendarDate.month - 1, 1))
+  const nextMilestone = milestones.find((milestone) => !milestone.unlocked) || milestones[milestones.length - 1]
+
+  const moveMonth = (amount) => {
+    setCalendarDate((current) => {
+      const date = new Date(current.year, current.month - 1 + amount, 1)
+      return {
+        month: date.getMonth() + 1,
+        year: date.getFullYear(),
+      }
+    })
+  }
+
   return (
     <>
       <PageHeader eyebrow="Streak Calendar" title="Consistency Record" description="Completed, missed, partial, and today states across the month." />
+      {error && <p className="form-error">{error}</p>}
       <div className="stats-grid">
-        <StatCard label="Current Streak" value="12 days" meta="Next milestone: 14" icon={Flame} />
-        <StatCard label="Best Streak" value="21 days" meta="Personal record" icon={Trophy} />
-        <StatCard label="Completion Rate" value="88%" meta="This month" icon={Activity} />
+        <StatCard label="Current Streak" value={`${summary?.currentStreak || 0} days`} meta={`Next milestone: ${summary?.nextMilestone || 7}`} icon={Flame} />
+        <StatCard label="Best Streak" value={`${summary?.bestStreak || 0} days`} meta="Personal record" icon={Trophy} />
+        <StatCard label="Completion Rate" value={`${summary?.completionRate || 0}%`} meta={`${summary?.totalCompletedDays || 0}/${summary?.totalTrackedDays || 0} tracked days`} icon={Activity} />
       </div>
-      <Card title="Monthly Calendar Grid" label="June">
-        <CalendarGrid days={streakDays} />
+      <Card
+        title="Monthly Calendar Grid"
+        label={monthLabel}
+        action={(
+          <div className="splash-actions">
+            <Button variant="secondary" onClick={() => moveMonth(-1)}>Previous</Button>
+            <Button variant="secondary" onClick={() => moveMonth(1)}>Next</Button>
+          </div>
+        )}
+      >
+        <CalendarGrid days={calendar.days} />
       </Card>
-      <Card title="Weekly Consistency" label="Next milestone">
-        <ProgressBar value={88} />
-        <p className="muted-text">Two more clean days unlock the 14 day milestone.</p>
+      <Card title="Weekly Consistency" label="Current week">
+        <ProgressBar value={weekly?.percentage || 0} />
+        <p className="muted-text">{weekly?.completedDays || 0} of {weekly?.totalDays || 7} days completed this week.</p>
+      </Card>
+      <Card title="Next Milestone" label={nextMilestone?.title || '7-Day Streak'}>
+        <ProgressBar value={summary?.milestoneProgress || 0} />
+        <p className="muted-text">{summary?.currentStreak || 0} of {summary?.nextMilestone || 7} days completed.</p>
       </Card>
     </>
   )
@@ -1802,6 +1867,14 @@ function ReviewPage({ title, range, data, summary }) {
 
 export function IdentityPage() {
   const { user } = useAuth()
+  const [identityCalendarDate] = useState(() => {
+    const now = new Date()
+    return {
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+    }
+  })
+  const { summary: identityStreakSummary } = useStreak(identityCalendarDate.month, identityCalendarDate.year)
 
   return (
     <>
@@ -1814,7 +1887,7 @@ export function IdentityPage() {
       <div className="stats-grid">
         <StatCard label="Mission Completed" value="124" icon={CheckCircle2} />
         <StatCard label="Deep Work Hours" value="286h" icon={Clock} />
-        <StatCard label="Current Streak" value="12 days" icon={Flame} />
+        <StatCard label="Current Streak" value={`${identityStreakSummary?.currentStreak || 0} days`} icon={Flame} />
         <StatCard label="Resistance Events" value="247" icon={ShieldCheck} />
         <StatCard label="Healthy Consumption Days" value={consumptionControl.identityStats.healthyDays} icon={ShieldCheck} />
         <StatCard label="Videos Avoided" value={consumptionControl.identityStats.videosAvoided} icon={Ban} />
