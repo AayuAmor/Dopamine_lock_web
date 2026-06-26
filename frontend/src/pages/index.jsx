@@ -49,9 +49,7 @@ import {
 import { useAuth } from '../context/useAuth'
 import {
   achievements,
-  allowedWebsites,
   analytics,
-  blockedWebsites,
   consumptionControl,
   disciplineScore,
   futureFeatures,
@@ -61,8 +59,16 @@ import {
   streakDays,
   weeklyReview,
 } from '../data/mockData'
+import { useBlockManager } from '../hooks/useBlockManager'
 import { useMissions } from '../hooks/useMissions'
 import { useMissionSession } from '../hooks/useMissionSession'
+import {
+  createRule,
+  deleteRule as deleteBlockRule,
+  disablePreset,
+  enablePreset,
+  toggleRule as toggleBlockRule,
+} from '../services/blockManagerService'
 import {
   archiveMission,
   createMission,
@@ -79,7 +85,28 @@ import {
 } from '../services/missionSessionService'
 
 const missionRules = ['Strict mode', 'Block all notifications', 'Prevent tab switching']
-const categories = ['Social', 'Video', 'Forums', 'News', 'Gaming', 'Shopping']
+const blockCategories = [
+  'SOCIAL_MEDIA',
+  'ENTERTAINMENT',
+  'GAMING',
+  'SHOPPING',
+  'NEWS',
+  'ADULT',
+  'CUSTOM',
+  'PRODUCTIVITY',
+  'EDUCATION',
+]
+const blockCategoryLabels = {
+  ADULT: 'Adult',
+  CUSTOM: 'Custom',
+  EDUCATION: 'Education',
+  ENTERTAINMENT: 'Entertainment',
+  GAMING: 'Gaming',
+  NEWS: 'News',
+  PRODUCTIVITY: 'Productivity',
+  SHOPPING: 'Shopping',
+  SOCIAL_MEDIA: 'Social Media',
+}
 const missionFilters = ['All', 'Favorites', 'Archived', 'Easy', 'Medium', 'Hard']
 const missionSorts = ['Newest', 'Oldest', 'Alphabetical', 'Duration', 'Difficulty']
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -99,6 +126,12 @@ const defaultMissionForm = {
   blockNotifications: true,
   preventTabSwitching: true,
   status: 'Ready',
+}
+const defaultBlockRuleForm = {
+  category: 'CUSTOM',
+  domain: '',
+  reason: '',
+  type: 'BLOCKED',
 }
 
 function formatMemberSince(value) {
@@ -377,9 +410,11 @@ function AuthShell({ title, subtitle, children, onSubmit }) {
 export function DashboardPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { effectiveRules, presets } = useBlockManager()
   const { missions: userMissions } = useMissions()
   const { session: currentSession } = useMissionSession()
   const readyMission = userMissions.find((mission) => mission.status === 'Ready' && !mission.archived)
+  const activePresetCount = presets.filter((preset) => preset.enabled).length
 
   return (
     <>
@@ -395,9 +430,9 @@ export function DashboardPage() {
           meta={currentSession?.mission?.title || 'No Active Mission'}
           icon={Target}
         />
-        <StatCard label="Discipline Score" value={disciplineScore.score} meta={disciplineScore.rank} icon={Gauge} />
-        <StatCard label="Missions Created" value={userMissions.length} meta="Authenticated total" icon={Flame} />
-        <StatCard label="Today's Focus" value="3.4h" meta="Daily goal: 4h" icon={Clock} />
+        <StatCard label="Active Blocked" value={effectiveRules?.blockedDomains?.length || 0} meta="Effective websites" icon={Ban} />
+        <StatCard label="Allowed Websites" value={effectiveRules?.allowedDomains?.length || 0} meta="Effective access" icon={ShieldCheck} />
+        <StatCard label="Active Presets" value={activePresetCount} meta={`${userMissions.length} missions created`} icon={Flame} />
       </div>
       <div className="content-grid two-one">
         <Card title="Weekly Focus Chart" label="Hours locked">
@@ -976,6 +1011,7 @@ function MissionListItem({
 
 export function ActiveMissionPage() {
   const navigate = useNavigate()
+  const { effectiveRules } = useBlockManager()
   const {
     error: loadError,
     isLoading,
@@ -1012,6 +1048,8 @@ export function ActiveMissionPage() {
     }
   }, [clockNow, session])
   const mission = liveSession?.mission
+  const effectiveBlockedDomains = effectiveRules?.blockedDomains || []
+  const effectiveAllowedDomains = effectiveRules?.allowedDomains || []
 
   useEffect(() => {
     if (sessionStatus !== 'ACTIVE') {
@@ -1089,8 +1127,8 @@ export function ActiveMissionPage() {
         </Card>
         <Card title="Blocked Websites" label="Impulse perimeter">
           <div className="badge-row">
-            {mission.blockedWebsites.length > 0
-              ? mission.blockedWebsites.map((site) => <Badge key={site} label={site} />)
+            {[...new Set([...effectiveBlockedDomains, ...mission.blockedWebsites])].length > 0
+              ? [...new Set([...effectiveBlockedDomains, ...mission.blockedWebsites])].map((site) => <Badge key={site} label={site} />)
               : <p className="muted-text">No blocked websites set.</p>}
           </div>
         </Card>
@@ -1098,8 +1136,8 @@ export function ActiveMissionPage() {
       <div className="content-grid split">
         <Card title="Allowed Websites" label="Permitted">
           <div className="badge-row">
-            {mission.allowedWebsites.length > 0
-              ? mission.allowedWebsites.map((site) => <Badge key={site} label={site} />)
+            {[...new Set([...effectiveAllowedDomains, ...mission.allowedWebsites])].length > 0
+              ? [...new Set([...effectiveAllowedDomains, ...mission.allowedWebsites])].map((site) => <Badge key={site} label={site} />)
               : <p className="muted-text">No allowed websites set.</p>}
           </div>
         </Card>
@@ -1268,41 +1306,159 @@ export function ConsumptionControlPage() {
 }
 
 export function BlockManagerPage() {
+  const {
+    error: loadError,
+    isLoading,
+    presets,
+    refreshBlockManager,
+    rules,
+  } = useBlockManager()
+  const [form, setForm] = useState(() => ({ ...defaultBlockRuleForm }))
   const [query, setQuery] = useState('')
-  const blocked = blockedWebsites.filter((item) => item.site.includes(query.toLowerCase()) || item.category.toLowerCase().includes(query.toLowerCase()))
+  const [categoryFilter, setCategoryFilter] = useState('All')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const activePresets = presets.filter((preset) => preset.enabled)
+  const filteredRules = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    return rules.filter((rule) => {
+      const matchesSearch = !normalizedQuery
+        || rule.domain.includes(normalizedQuery)
+        || blockCategoryLabels[rule.category].toLowerCase().includes(normalizedQuery)
+        || (rule.reason || '').toLowerCase().includes(normalizedQuery)
+      const matchesCategory = categoryFilter === 'All' || rule.category === categoryFilter
+
+      return matchesSearch && matchesCategory
+    })
+  }, [categoryFilter, query, rules])
+  const blocked = filteredRules.filter((rule) => rule.type === 'BLOCKED')
+  const allowed = filteredRules.filter((rule) => rule.type === 'ALLOWED')
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const handleAddRule = async () => {
+    try {
+      setError('')
+      await createRule(form)
+      await refreshBlockManager()
+      setForm({ ...defaultBlockRuleForm })
+      setSuccess('Block rule added')
+    } catch (ruleError) {
+      setError(ruleError.message)
+      setSuccess('')
+    }
+  }
+
+  const handleRuleAction = async (action, successMessage) => {
+    try {
+      setError('')
+      await action()
+      await refreshBlockManager()
+      setSuccess(successMessage)
+    } catch (actionError) {
+      setError(actionError.message)
+      setSuccess('')
+    }
+  }
+
+  const handlePresetAction = async (preset) => {
+    await handleRuleAction(
+      () => (preset.enabled ? disablePreset(preset.id) : enablePreset(preset.id)),
+      preset.enabled ? 'Preset disabled' : 'Preset enabled',
+    )
+  }
 
   return (
     <>
       <PageHeader eyebrow="Block Manager" title="Control Digital Access" description="Manage the websites and categories allowed during discipline windows." />
+      {(error || loadError || success) && (
+        <p className={error || loadError ? 'form-error' : 'form-success'}>{error || loadError || success}</p>
+      )}
       <div className="toolbar">
-        <Input label="Add website input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search or add domain" />
-        <Button><Plus size={15} />Add Custom</Button>
-        <Button variant="secondary">Import Preset</Button>
+        <Input label="Search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search domains or categories" />
+        <Select label="Category filter" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+          <option>All</option>
+          {blockCategories.map((category) => <option key={category} value={category}>{blockCategoryLabels[category]}</option>)}
+        </Select>
       </div>
+      <Card title="Add Website Rule" label="Custom access">
+        <div className="form-grid">
+          <Input label="Domain" value={form.domain} onChange={(event) => updateField('domain', event.target.value)} placeholder="youtube.com" />
+          <Select label="Type" value={form.type} onChange={(event) => updateField('type', event.target.value)}>
+            <option value="BLOCKED">Blocked</option>
+            <option value="ALLOWED">Allowed</option>
+          </Select>
+          <Select label="Category" value={form.category} onChange={(event) => updateField('category', event.target.value)}>
+            {blockCategories.map((category) => <option key={category} value={category}>{blockCategoryLabels[category]}</option>)}
+          </Select>
+          <Input label="Reason" value={form.reason} onChange={(event) => updateField('reason', event.target.value)} placeholder="Optional reason" />
+        </div>
+        <Button onClick={handleAddRule}><Plus size={15} />Add Custom</Button>
+      </Card>
       <div className="content-grid split">
-        <Card title="Blocked Websites List" label="Denied">
-          <WebsiteList items={blocked} danger />
+        <Card title="Blocked Websites List" label={isLoading ? 'Loading' : `${blocked.length} denied`}>
+          <WebsiteList
+            danger
+            items={blocked}
+            onDelete={(rule) => handleRuleAction(() => deleteBlockRule(rule.id), 'Rule deleted')}
+            onToggle={(rule) => handleRuleAction(() => toggleBlockRule(rule.id), 'Rule updated')}
+          />
         </Card>
-        <Card title="Allowed Websites List" label="Permitted">
-          <WebsiteList items={allowedWebsites} />
+        <Card title="Allowed Websites List" label={isLoading ? 'Loading' : `${allowed.length} permitted`}>
+          <WebsiteList
+            items={allowed}
+            onDelete={(rule) => handleRuleAction(() => deleteBlockRule(rule.id), 'Rule deleted')}
+            onToggle={(rule) => handleRuleAction(() => toggleBlockRule(rule.id), 'Rule updated')}
+          />
         </Card>
       </div>
+      <Card title="Active Presets" label={`${activePresets.length} enabled`}>
+        <div className="list-stack">
+          {presets.map((preset) => (
+            <div className="compact-row" key={preset.id}>
+              <div>
+                <strong>{preset.name}</strong>
+                <span>{preset.description}</span>
+              </div>
+              <div className="splash-actions">
+                <Badge label={blockCategoryLabels[preset.category]} />
+                <Badge label={`${preset.websites.length} sites`} />
+                <Button variant={preset.enabled ? 'danger' : 'secondary'} onClick={() => handlePresetAction(preset)}>
+                  {preset.enabled ? 'Disable' : 'Enable'}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
       <Card title="Presets" label="Category badges">
-        <div className="badge-row">{categories.map((category) => <Badge key={category} label={category} />)}</div>
+        <div className="badge-row">{blockCategories.map((category) => <Badge key={category} label={blockCategoryLabels[category]} />)}</div>
       </Card>
     </>
   )
 }
 
-function WebsiteList({ items, danger }) {
+function WebsiteList({ items, danger, onDelete, onToggle }) {
   return (
     <div className="list-stack">
       {items.map((item) => (
         <div className="compact-row" key={item.id}>
-          <strong>{item.site}</strong>
-          <Badge label={item.category} tone={danger ? 'danger' : 'default'} />
+          <div>
+            <strong>{item.domain}</strong>
+            <span>{item.reason || blockCategoryLabels[item.category]}</span>
+          </div>
+          <div className="splash-actions">
+            <Badge label={blockCategoryLabels[item.category]} tone={danger ? 'danger' : 'default'} />
+            <Badge label={item.active ? 'Active' : 'Inactive'} tone={item.active ? 'default' : 'muted'} />
+            <Button variant="secondary" onClick={() => onToggle(item)}>{item.active ? 'Disable' : 'Enable'}</Button>
+            <Button variant="danger" onClick={() => onDelete(item)}>Delete</Button>
+          </div>
         </div>
       ))}
+      {items.length === 0 && <p className="muted-text">No websites match this view.</p>}
     </div>
   )
 }
@@ -1538,16 +1694,19 @@ export function IdentityPage() {
 }
 
 export function BrowserExtensionPage() {
+  const { effectiveRules, presets } = useBlockManager()
+  const activePresetCount = presets.filter((preset) => preset.enabled).length
+
   return (
     <>
       <PageHeader eyebrow="Browser Extension" title="Extension Control" description="Monitor connection state and synced blocking results." action={<Button>Manage Extension</Button>} />
       <div className="stats-grid">
-        <StatCard label="Extension Status" value="Active" icon={ShieldCheck} />
-        <StatCard label="Connected Browser" value="Chrome" icon={Lock} />
-        <StatCard label="Sync Status" value="Synced" icon={Activity} />
-        <StatCard label="Sites Blocked" value="42" icon={Ban} />
-        <StatCard label="Time Saved" value="18.4h" icon={Clock} />
-        <StatCard label="Distractions Prevented" value="247" icon={Target} />
+        <StatCard label="Extension Status" value="Ready" icon={ShieldCheck} />
+        <StatCard label="Sync Status" value="Sync-ready" icon={Activity} />
+        <StatCard label="Effective Blocked" value={effectiveRules?.blockedDomains?.length || 0} icon={Ban} />
+        <StatCard label="Allowed Websites" value={effectiveRules?.allowedDomains?.length || 0} icon={Lock} />
+        <StatCard label="Active Presets" value={activePresetCount} icon={Target} />
+        <StatCard label="Sync Engine" value="Pending" icon={Clock} />
       </div>
     </>
   )

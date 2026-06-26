@@ -26,6 +26,29 @@ enum MissionSessionStatus {
   ABANDONED
 }
 
+enum BlockRuleType {
+  BLOCKED
+  ALLOWED
+}
+
+enum BlockCategory {
+  SOCIAL_MEDIA
+  ENTERTAINMENT
+  GAMING
+  SHOPPING
+  NEWS
+  ADULT
+  CUSTOM
+  PRODUCTIVITY
+  EDUCATION
+}
+
+enum BlockRuleSource {
+  CUSTOM
+  PRESET
+  MISSION
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   fullName     String   @map("full_name") @db.VarChar(120)
@@ -42,6 +65,8 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   missions     Mission[]
   missionSessions MissionSession[]
+  blockRules   BlockRule[]
+  userPresetBlockLists UserPresetBlockList[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
@@ -105,4 +130,54 @@ model MissionSession {
   @@index([userId, status], map: "idx_mission_sessions_user_status")
   @@index([userId, startedAt], map: "idx_mission_sessions_user_started_at")
   @@map("mission_sessions")
+}
+
+model BlockRule {
+  id        Int             @id @default(autoincrement())
+  userId    Int             @map("user_id")
+  domain    String          @db.VarChar(255)
+  type      BlockRuleType
+  category  BlockCategory   @default(CUSTOM)
+  reason    String?         @db.VarChar(500)
+  active    Boolean         @default(true)
+  source    BlockRuleSource @default(CUSTOM)
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, domain, type], map: "block_rules_user_domain_type_key")
+  @@index([userId], map: "idx_block_rules_user_id")
+  @@index([userId, active], map: "idx_block_rules_user_active")
+  @@index([userId, type], map: "idx_block_rules_user_type")
+  @@map("block_rules")
+}
+
+model PresetBlockList {
+  id        Int                   @id @default(autoincrement())
+  name      String                @unique @db.VarChar(120)
+  description String?             @db.VarChar(500)
+  category  BlockCategory
+  websites  Json                  @default("[]")
+  active    Boolean               @default(true)
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  userPresets UserPresetBlockList[]
+
+  @@index([active], map: "idx_preset_block_lists_active")
+  @@map("preset_block_lists")
+}
+
+model UserPresetBlockList {
+  id                Int             @id @default(autoincrement())
+  userId            Int             @map("user_id")
+  presetBlockListId Int             @map("preset_block_list_id")
+  enabled           Boolean         @default(true)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  presetBlockList   PresetBlockList @relation(fields: [presetBlockListId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, presetBlockListId], map: "user_preset_block_lists_user_preset_key")
+  @@index([userId, enabled], map: "idx_user_preset_block_lists_user_enabled")
+  @@map("user_preset_block_lists")
 }

@@ -37,19 +37,6 @@ export const sessions = [
   },
 ]
 
-export const blockedWebsites = [
-  { id: 1, site: 'youtube.com', category: 'Video' },
-  { id: 2, site: 'x.com', category: 'Social' },
-  { id: 3, site: 'reddit.com', category: 'Forums' },
-  { id: 4, site: 'instagram.com', category: 'Social' },
-]
-
-export const allowedWebsites = [
-  { id: 1, site: 'leetcode.com', category: 'DSA' },
-  { id: 2, site: 'github.com', category: 'Build' },
-  { id: 3, site: 'docs.python.org', category: 'Docs' },
-]
-
 export const goals = [
   { id: 1, title: 'Master DSA', progress: 64 },
   { id: 2, title: 'Build Projects', progress: 48 },
