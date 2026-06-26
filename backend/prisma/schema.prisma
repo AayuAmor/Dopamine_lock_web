@@ -59,27 +59,36 @@ enum DisciplineScoreEventSource {
   MANUAL_RECALCULATION
 }
 
+enum ConsumptionLogSource {
+  MANUAL
+  EXTENSION
+  IMPORTED
+}
+
 model User {
-  id                       Int                       @id @default(autoincrement())
-  fullName                 String                    @map("full_name") @db.VarChar(120)
-  email                    String                    @unique @db.VarChar(255)
-  passwordHash             String                    @map("password_hash")
-  bio                      String?                   @db.VarChar(500)
-  avatarUrl                String?                   @map("avatar_url")
-  timezone                 String                    @default("Asia/Kathmandu") @db.VarChar(80)
-  dailyFocusGoal           Int                       @default(4) @map("daily_focus_goal")
-  preferredMissionDuration Int                       @default(50) @map("preferred_mission_duration")
-  disciplineTitle          String                    @default("DISCIPLINED BUILDER") @map("discipline_title") @db.VarChar(80)
-  role                     String                    @default("user") @db.VarChar(50)
-  createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  missions                 Mission[]
-  missionSessions          MissionSession[]
-  blockRules               BlockRule[]
-  userPresetBlockLists     UserPresetBlockList[]
-  disciplineScore          DisciplineScore?
-  disciplineScoreEvents    DisciplineScoreEvent[]
-  disciplineScoreSnapshots DisciplineScoreSnapshot[]
+  id                        Int                       @id @default(autoincrement())
+  fullName                  String                    @map("full_name") @db.VarChar(120)
+  email                     String                    @unique @db.VarChar(255)
+  passwordHash              String                    @map("password_hash")
+  bio                       String?                   @db.VarChar(500)
+  avatarUrl                 String?                   @map("avatar_url")
+  timezone                  String                    @default("Asia/Kathmandu") @db.VarChar(80)
+  dailyFocusGoal            Int                       @default(4) @map("daily_focus_goal")
+  preferredMissionDuration  Int                       @default(50) @map("preferred_mission_duration")
+  disciplineTitle           String                    @default("DISCIPLINED BUILDER") @map("discipline_title") @db.VarChar(80)
+  role                      String                    @default("user") @db.VarChar(50)
+  createdAt                 DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  missions                  Mission[]
+  missionSessions           MissionSession[]
+  blockRules                BlockRule[]
+  userPresetBlockLists      UserPresetBlockList[]
+  disciplineScore           DisciplineScore?
+  disciplineScoreEvents     DisciplineScoreEvent[]
+  disciplineScoreSnapshots  DisciplineScoreSnapshot[]
+  consumptionLimits         ConsumptionLimit[]
+  consumptionLogs           ConsumptionLog[]
+  consumptionDailySummaries ConsumptionDailySummary[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
@@ -251,4 +260,75 @@ model DisciplineScoreSnapshot {
   @@unique([userId, date], map: "discipline_score_snapshots_user_date_key")
   @@index([userId, date], map: "idx_discipline_score_snapshots_user_date")
   @@map("discipline_score_snapshots")
+}
+
+model ConsumptionPlatform {
+  id        Int                @id @default(autoincrement())
+  name      String             @unique @db.VarChar(120)
+  slug      String             @unique @db.VarChar(120)
+  category  String             @default("SHORT_FORM") @db.VarChar(80)
+  domain    String             @db.VarChar(255)
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  limits    ConsumptionLimit[]
+  logs      ConsumptionLog[]
+
+  @@index([slug], map: "idx_consumption_platforms_slug")
+  @@map("consumption_platforms")
+}
+
+model ConsumptionLimit {
+  id               Int                  @id @default(autoincrement())
+  userId           Int                  @map("user_id")
+  platformId       Int?                 @map("platform_id")
+  maxVideosPerDay  Int                  @default(40) @map("max_videos_per_day")
+  maxMinutesPerDay Int                  @default(120) @map("max_minutes_per_day")
+  warningThreshold Int                  @default(80) @map("warning_threshold")
+  strictLockMode   Boolean              @default(true) @map("strict_lock_mode")
+  active           Boolean              @default(true)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform         ConsumptionPlatform? @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platformId], map: "consumption_limits_user_platform_key")
+  @@index([userId], map: "idx_consumption_limits_user_id")
+  @@map("consumption_limits")
+}
+
+model ConsumptionLog {
+  id              Int                  @id @default(autoincrement())
+  userId          Int                  @map("user_id")
+  platformId      Int                  @map("platform_id")
+  videosWatched   Int                  @default(0) @map("videos_watched")
+  minutesConsumed Int                  @default(0) @map("minutes_consumed")
+  source          ConsumptionLogSource @default(MANUAL)
+  consumedAt      DateTime             @default(now()) @map("consumed_at") @db.Timestamptz(6)
+  metadata        Json                 @default("{}")
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform        ConsumptionPlatform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@index([userId, consumedAt], map: "idx_consumption_logs_user_consumed_at")
+  @@index([platformId], map: "idx_consumption_logs_platform_id")
+  @@map("consumption_logs")
+}
+
+model ConsumptionDailySummary {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  date           DateTime @db.Date
+  totalVideos    Int      @default(0) @map("total_videos")
+  totalMinutes   Int      @default(0) @map("total_minutes")
+  score          Int      @default(100)
+  limitReached   Boolean  @default(false) @map("limit_reached")
+  warningReached Boolean  @default(false) @map("warning_reached")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date], map: "consumption_daily_summaries_user_date_key")
+  @@index([userId, date], map: "idx_consumption_daily_summaries_user_date")
+  @@map("consumption_daily_summaries")
 }

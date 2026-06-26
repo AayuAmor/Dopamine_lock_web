@@ -35,6 +35,33 @@ const presetBlockLists = [
   },
 ]
 
+const consumptionPlatforms = [
+  {
+    category: 'SHORT_FORM',
+    domain: 'youtube.com/shorts',
+    name: 'YouTube Shorts',
+    slug: 'youtube-shorts',
+  },
+  {
+    category: 'SHORT_FORM',
+    domain: 'instagram.com/reels',
+    name: 'Instagram Reels',
+    slug: 'instagram-reels',
+  },
+  {
+    category: 'SHORT_FORM',
+    domain: 'tiktok.com',
+    name: 'TikTok',
+    slug: 'tiktok',
+  },
+  {
+    category: 'SHORT_FORM',
+    domain: 'facebook.com/reels',
+    name: 'Facebook Reels',
+    slug: 'facebook-reels',
+  },
+]
+
 async function main() {
   for (const preset of presetBlockLists) {
     await prisma.presetBlockList.upsert({
@@ -47,6 +74,22 @@ async function main() {
       },
       create: {
         ...preset,
+        active: true,
+      },
+    })
+  }
+
+  for (const platform of consumptionPlatforms) {
+    await prisma.consumptionPlatform.upsert({
+      where: { slug: platform.slug },
+      update: {
+        active: true,
+        category: platform.category,
+        domain: platform.domain,
+        name: platform.name,
+      },
+      create: {
+        ...platform,
         active: true,
       },
     })

@@ -215,7 +215,7 @@ export function ProgressBar({ value }) {
 }
 
 export function MiniBarChart({ values }) {
-  const max = Math.max(...values)
+  const max = Math.max(...values, 1)
   return (
     <div className="mini-bars">
       {values.map((value, index) => (
@@ -294,7 +294,12 @@ export function GoalCard({ goal }) {
 }
 
 export function PlatformUsageCard({ platform }) {
-  const tone = platform.status === 'Limit Reached' ? 'danger' : platform.status === 'Warning' ? 'muted' : 'default'
+  const statusLabel = platform.status === 'LIMIT_REACHED'
+    ? 'Limit Reached'
+    : platform.status === 'WARNING'
+      ? 'Warning'
+      : platform.status
+  const tone = statusLabel === 'Limit Reached' ? 'danger' : statusLabel === 'Warning' ? 'muted' : 'default'
 
   return (
     <article className="platform-card">
@@ -310,10 +315,10 @@ export function PlatformUsageCard({ platform }) {
       <div className="platform-stats">
         <span>{platform.videos} videos watched</span>
         <span>{platform.minutes} minutes spent</span>
-        <span>Daily limit {platform.limit}</span>
+        <span>Daily limit {platform.limit || platform.dailyVideoLimit}</span>
       </div>
       <ProgressBar value={platform.progress} />
-      <Badge label={platform.status} tone={tone} />
+      <Badge label={statusLabel} tone={tone} />
     </article>
   )
 }

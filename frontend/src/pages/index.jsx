@@ -50,13 +50,13 @@ import { useAuth } from '../context/useAuth'
 import {
   achievements,
   analytics,
-  consumptionControl,
   futureFeatures,
   goals,
   monthlyReview,
   weeklyReview,
 } from '../data/mockData'
 import { useBlockManager } from '../hooks/useBlockManager'
+import { useConsumption } from '../hooks/useConsumption'
 import { useDisciplineScore } from '../hooks/useDisciplineScore'
 import { useMissions } from '../hooks/useMissions'
 import { useMissionSession } from '../hooks/useMissionSession'
@@ -69,6 +69,10 @@ import {
   enablePreset,
   toggleRule as toggleBlockRule,
 } from '../services/blockManagerService'
+import {
+  createLog as createConsumptionLog,
+  updateLimits as updateConsumptionLimits,
+} from '../services/consumptionService'
 import { recalculateScore } from '../services/disciplineScoreService'
 import {
   archiveMission,
@@ -137,6 +141,11 @@ const defaultBlockRuleForm = {
   domain: '',
   reason: '',
   type: 'BLOCKED',
+}
+const defaultConsumptionLogForm = {
+  minutesConsumed: '',
+  platformSlug: '',
+  videosWatched: '',
 }
 
 function formatMemberSince(value) {
@@ -489,6 +498,7 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { score: disciplineSummary } = useDisciplineScore()
+  const { summary: consumptionSummary } = useConsumption()
   const { effectiveRules, presets } = useBlockManager()
   const { history: recentHistory } = useSessionHistory({ limit: 3, page: 1, sort: 'Newest' })
   const { missions: userMissions } = useMissions()
@@ -555,10 +565,10 @@ export function DashboardPage() {
         action={<Button variant="secondary" onClick={() => navigate('/consumption-control')}>Manage Consumption</Button>}
       >
         <div className="review-grid compact-review">
-          <ReviewStatCard label="Today's Reels" value={consumptionControl.today.reels} />
-          <ReviewStatCard label="Today's Shorts" value={consumptionControl.today.shorts} />
-          <ReviewStatCard label="Time Consumed" value={consumptionControl.today.timeConsumed} />
-          <ReviewStatCard label="Healthy Consumption" value={`${consumptionControl.today.healthyPercent}%`} />
+          <ReviewStatCard label="Today's Reels" value={consumptionSummary?.todaysReels || 0} />
+          <ReviewStatCard label="Today's Shorts" value={consumptionSummary?.todaysShorts || 0} />
+          <ReviewStatCard label="Time Consumed" value={consumptionSummary?.timeConsumed || '0m'} />
+          <ReviewStatCard label="Healthy Consumption" value={`${consumptionSummary?.dailyConsumptionScore || 100}%`} />
         </div>
       </Card>
       <Card title="Recent Sessions" label="Last activity">
@@ -1285,17 +1295,93 @@ export function ActiveMissionPage() {
 
 export function ConsumptionControlPage() {
   const navigate = useNavigate()
-  const [limits, setLimits] = useState(consumptionControl.limits)
-  const [strictMode, setStrictMode] = useState(true)
-  const [threshold, setThreshold] = useState('90')
-  const timelineValues = consumptionControl.timeline.map((item) => item.total)
+  const {
+    error: loadError,
+    limits,
+    platforms,
+    refreshConsumption,
+    summary,
+    timeline,
+    weekly,
+  } = useConsumption()
+  const [limitForm, setLimitForm] = useState({
+    maxMinutesPerDay: 120,
+    maxVideosPerDay: 40,
+    strictLockMode: true,
+    warningThreshold: 80,
+  })
+  const [logForm, setLogForm] = useState(() => ({ ...defaultConsumptionLogForm }))
+  const [message, setMessage] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [limitTouched, setLimitTouched] = useState(false)
+  const timelineValues = timeline.length ? timeline.map((item) => item.totalVideos) : [0, 0, 0, 0, 0, 0, 0]
+  const activeLimitForm = limitTouched ? limitForm : {
+    maxMinutesPerDay: limits?.global?.maxMinutesPerDay || limitForm.maxMinutesPerDay,
+    maxVideosPerDay: limits?.global?.maxVideosPerDay || limitForm.maxVideosPerDay,
+    strictLockMode: limits?.global?.strictLockMode ?? limitForm.strictLockMode,
+    warningThreshold: limits?.global?.warningThreshold || limitForm.warningThreshold,
+  }
+  const activePlatformSlug = logForm.platformSlug || platforms[0]?.slug || ''
 
   const updateLimit = (key, value) => {
-    setLimits((current) => ({ ...current, [key]: value }))
+    setLimitTouched(true)
+    setLimitForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const updateLogField = (key, value) => {
+    setLogForm((current) => ({ ...current, [key]: value }))
+  }
+
+  async function handleLimitSave() {
+    try {
+      setIsSaving(true)
+      setMessage('')
+      await updateConsumptionLimits({
+        global: {
+          maxMinutesPerDay: Number(activeLimitForm.maxMinutesPerDay),
+          maxVideosPerDay: Number(activeLimitForm.maxVideosPerDay),
+          strictLockMode: activeLimitForm.strictLockMode,
+          warningThreshold: Number(activeLimitForm.warningThreshold),
+        },
+      })
+      await refreshConsumption()
+      setLimitTouched(false)
+      setMessage('Consumption limits updated.')
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function handleLogSubmit(event) {
+    event.preventDefault()
+
+    try {
+      setIsSaving(true)
+      setMessage('')
+      await createConsumptionLog({
+        minutesConsumed: Number(logForm.minutesConsumed),
+        platformSlug: activePlatformSlug,
+        videosWatched: Number(logForm.videosWatched),
+      })
+      setLogForm((current) => ({
+        ...defaultConsumptionLogForm,
+        platformSlug: current.platformSlug,
+      }))
+      await refreshConsumption()
+      setMessage('Consumption log added.')
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
     <>
+      {loadError && <p className="form-message form-error">{loadError}</p>}
+      {message && <p className={`form-message ${message.includes('updated') || message.includes('added') ? 'form-success' : 'form-error'}`}>{message}</p>}
       <section className="consumption-hero">
         <div>
           <p className="eyebrow">Consumption Control</p>
@@ -1304,16 +1390,16 @@ export function ConsumptionControlPage() {
         </div>
         <Card className="daily-score-card">
           <p className="eyebrow">Daily Consumption Score</p>
-          <strong>{consumptionControl.score} / 100</strong>
-          <Badge label={consumptionControl.status} />
+          <strong>{summary?.dailyConsumptionScore ?? 100} / 100</strong>
+          <Badge label={summary?.statusText || 'Healthy Consumption'} tone={summary?.limitReached ? 'danger' : summary?.warningReached ? 'muted' : 'default'} />
         </Card>
       </section>
 
       <div className="stats-grid">
-        <StatCard label="Today's Reels" value={consumptionControl.today.reels} icon={Smartphone} />
-        <StatCard label="Today's Shorts" value={consumptionControl.today.shorts} icon={TimerReset} />
-        <StatCard label="Time Consumed" value={consumptionControl.today.timeConsumed} icon={Clock} />
-        <StatCard label="Daily Limit Remaining" value={consumptionControl.today.limitRemaining} icon={ShieldCheck} />
+        <StatCard label="Today's Reels" value={summary?.todaysReels || 0} icon={Smartphone} />
+        <StatCard label="Today's Shorts" value={summary?.todaysShorts || 0} icon={TimerReset} />
+        <StatCard label="Time Consumed" value={summary?.timeConsumed || '0m'} icon={Clock} />
+        <StatCard label="Daily Limit Remaining" value={summary?.dailyLimitRemaining || '0 Videos'} icon={ShieldCheck} />
       </div>
 
       <section className="panel-section">
@@ -1324,9 +1410,10 @@ export function ConsumptionControlPage() {
           </div>
         </div>
         <div className="platform-grid">
-          {consumptionControl.platforms.map((platform) => (
+          {platforms.map((platform) => (
             <PlatformUsageCard key={platform.id} platform={platform} />
           ))}
+          {platforms.length === 0 && <p className="muted-text">No consumption platforms configured.</p>}
         </div>
       </section>
 
@@ -1334,47 +1421,59 @@ export function ConsumptionControlPage() {
         <Card title="Consumption Timeline" label="Last 7 days">
           <LineChartMock values={timelineValues} />
           <div className="chart-labels">
-            {consumptionControl.timeline.map((item) => (
+            {timeline.map((item) => (
               <span key={item.day}>{item.day.slice(0, 3)}</span>
             ))}
           </div>
         </Card>
-        <Card title="Daily Limit Manager" label="Frontend controls">
+        <Card title="Daily Limit Manager" label="Backend limits">
           <div className="form-grid">
-            <Input label="Maximum reels per day" type="number" value={limits.reels} onChange={(event) => updateLimit('reels', event.target.value)} />
-            <Input label="Maximum shorts per day" type="number" value={limits.shorts} onChange={(event) => updateLimit('shorts', event.target.value)} />
-            <Input label="Maximum TikTok videos" type="number" value={limits.tiktok} onChange={(event) => updateLimit('tiktok', event.target.value)} />
-            <Input label="Maximum total watch time" type="number" value={limits.watchTime} onChange={(event) => updateLimit('watchTime', event.target.value)} />
+            <Input label="Maximum videos per day" type="number" value={activeLimitForm.maxVideosPerDay} onChange={(event) => updateLimit('maxVideosPerDay', event.target.value)} />
+            <Input label="Maximum total watch time" type="number" value={activeLimitForm.maxMinutesPerDay} onChange={(event) => updateLimit('maxMinutesPerDay', event.target.value)} />
           </div>
           <label className="compact-row strict-toggle">
             <span>Strict Lock Mode</span>
-            <input type="checkbox" checked={strictMode} onChange={(event) => setStrictMode(event.target.checked)} />
+            <input type="checkbox" checked={activeLimitForm.strictLockMode} onChange={(event) => updateLimit('strictLockMode', event.target.checked)} />
           </label>
-          {strictMode && (
+          {activeLimitForm.strictLockMode && (
             <p className="muted-text">When your limit is reached, Dopamine Lock blocks further access until tomorrow.</p>
           )}
+          <Button onClick={handleLimitSave} disabled={isSaving}>Save Limits</Button>
         </Card>
       </div>
 
       <div className="content-grid split">
         <Card title="Warning Threshold" label="Limit alerts">
-          <Select label="Choose threshold" value={threshold} onChange={(event) => setThreshold(event.target.value)}>
+          <Select label="Choose threshold" value={activeLimitForm.warningThreshold} onChange={(event) => updateLimit('warningThreshold', event.target.value)}>
             <option value="50">50%</option>
             <option value="75">75%</option>
             <option value="90">90%</option>
             <option value="100">100%</option>
           </Select>
-          <p className="warning-preview">You have consumed {threshold}% of today's reel limit.</p>
+          <p className="warning-preview">You have consumed {activeLimitForm.warningThreshold}% of today's reel limit.</p>
         </Card>
         <Card title="Weekly Analytics" label="Consumption reduction">
           <div className="review-grid compact-review">
-            <ReviewStatCard label="Average Daily Consumption" value={consumptionControl.weekly.averageDailyConsumption} />
-            <ReviewStatCard label="Videos Avoided" value={consumptionControl.weekly.videosAvoided} />
-            <ReviewStatCard label="Estimated Time Saved" value={consumptionControl.weekly.estimatedTimeSaved} />
-            <ReviewStatCard label="Focus Hours Gained" value={consumptionControl.weekly.focusHoursGained} />
+            <ReviewStatCard label="Average Daily Consumption" value={weekly?.averageDailyConsumption || '0 videos'} />
+            <ReviewStatCard label="Videos Avoided" value={weekly?.videosAvoided || 0} />
+            <ReviewStatCard label="Estimated Time Saved" value={weekly?.estimatedTimeSaved || '0m'} />
+            <ReviewStatCard label="Focus Hours Gained" value={weekly?.focusHoursGained || '0.0h'} />
           </div>
         </Card>
       </div>
+
+      <Card title="Add Consumption Log" label="Manual entry">
+        <form className="form-grid" onSubmit={handleLogSubmit}>
+          <Select label="Platform" value={activePlatformSlug} onChange={(event) => updateLogField('platformSlug', event.target.value)}>
+            {platforms.map((platform) => (
+              <option key={platform.slug} value={platform.slug}>{platform.platformName}</option>
+            ))}
+          </Select>
+          <Input label="Videos Watched" type="number" min="0" value={logForm.videosWatched} onChange={(event) => updateLogField('videosWatched', event.target.value)} />
+          <Input label="Minutes Consumed" type="number" min="0" value={logForm.minutesConsumed} onChange={(event) => updateLogField('minutesConsumed', event.target.value)} />
+          <Button disabled={isSaving} type="submit">Add Log</Button>
+        </form>
+      </Card>
 
       <Card title="Dopamine Awareness" label="Educational brief" className="awareness-card">
         <p>
@@ -1841,16 +1940,23 @@ export function DisciplineScorePage() {
 }
 
 export function AnalyticsPage() {
+  const { platforms, summary: consumptionSummary, timeline, weekly } = useConsumption()
+  const consumptionTrend = timeline.length ? timeline.map((item) => item.score) : analytics.consumptionTrend
+  const weeklyReels = timeline.length ? timeline.map((item) => item.totalVideos) : analytics.weeklyReels
+  const weeklyShorts = timeline.length ? timeline.map((item) => item.totalMinutes) : analytics.weeklyShorts
+  const platformBreakdown = platforms.length ? platforms.map((platform) => platform.videosWatched) : analytics.platformBreakdown
+
   return (
     <>
       <PageHeader eyebrow="Analytics" title="Focus Intelligence" description="Measure hours, success rate, blocks prevented, and saved time." />
       <div className="stats-grid">
         <StatCard label="Mission Success Rate" value={`${analytics.successRate}%`} icon={CheckCircle2} />
         <StatCard label="Blocks Prevented" value={analytics.blocksPrevented} icon={Ban} />
-        <StatCard label="Time Saved" value={analytics.timeSaved} icon={Clock} />
-        <StatCard label="Weekly Average" value={analytics.weeklyAverage} icon={Activity} />
-        <StatCard label="Best Day" value={analytics.bestDay} icon={Trophy} />
+        <StatCard label="Time Saved" value={weekly?.estimatedTimeSaved || analytics.timeSaved} icon={Clock} />
+        <StatCard label="Weekly Average" value={weekly?.averageDailyConsumption || analytics.weeklyAverage} icon={Activity} />
+        <StatCard label="Best Day" value={weekly?.bestControlDay || analytics.bestDay} icon={Trophy} />
         <StatCard label="Total Sessions" value={analytics.totalSessions} icon={Target} />
+        <StatCard label="Time Consumed" value={consumptionSummary?.timeConsumed || '0m'} icon={Smartphone} />
       </div>
       <Card title="Focus Hours Chart" label="Last 7 days"><MiniBarChart values={analytics.focusHours} /></Card>
       <section className="panel-section">
@@ -1861,11 +1967,11 @@ export function AnalyticsPage() {
           </div>
         </div>
         <div className="content-grid split">
-          <Card title="Weekly Reels" label="Videos"><MiniBarChart values={analytics.weeklyReels} /></Card>
-          <Card title="Weekly Shorts" label="Videos"><MiniBarChart values={analytics.weeklyShorts} /></Card>
-          <Card title="Time Saved" label="Avoided consumption"><LineChartMock values={analytics.consumptionTrend} /></Card>
-          <Card title="Consumption Trend" label="Last 7 days"><LineChartMock values={analytics.consumptionTrend} /></Card>
-          <Card title="Platform Breakdown" label="Share of consumption"><MiniBarChart values={analytics.platformBreakdown} /></Card>
+          <Card title="Weekly Reels" label="Videos"><MiniBarChart values={weeklyReels} /></Card>
+          <Card title="Weekly Shorts" label="Minutes"><MiniBarChart values={weeklyShorts} /></Card>
+          <Card title="Time Saved" label="Avoided consumption"><LineChartMock values={consumptionTrend} /></Card>
+          <Card title="Consumption Trend" label="Last 7 days"><LineChartMock values={consumptionTrend} /></Card>
+          <Card title="Platform Breakdown" label="Share of consumption"><MiniBarChart values={platformBreakdown} /></Card>
         </div>
       </section>
     </>
@@ -1952,6 +2058,7 @@ function ReviewPage({ title, range, data, summary }) {
 
 export function IdentityPage() {
   const { user } = useAuth()
+  const { identity: consumptionIdentity } = useConsumption()
   const { score: identityScore } = useDisciplineScore()
   const [identityCalendarDate] = useState(() => {
     const now = new Date()
@@ -1977,10 +2084,10 @@ export function IdentityPage() {
         <StatCard label="Current Streak" value={`${identityStreakSummary?.currentStreak || 0} days`} icon={Flame} />
         <StatCard label="Discipline Rank" value={identityScore?.currentRank || 'D'} meta={`${identityScore?.totalXp || 0} XP`} icon={Gauge} />
         <StatCard label="Resistance Events" value="247" icon={ShieldCheck} />
-        <StatCard label="Healthy Consumption Days" value={consumptionControl.identityStats.healthyDays} icon={ShieldCheck} />
-        <StatCard label="Videos Avoided" value={consumptionControl.identityStats.videosAvoided} icon={Ban} />
-        <StatCard label="Time Saved" value={consumptionControl.identityStats.timeSaved} icon={Clock} />
-        <StatCard label="Digital Discipline Rating" value={consumptionControl.identityStats.rating} icon={Gauge} />
+        <StatCard label="Healthy Consumption Days" value={consumptionIdentity?.healthyDays || 0} icon={ShieldCheck} />
+        <StatCard label="Videos Avoided" value={consumptionIdentity?.videosAvoided || 0} icon={Ban} />
+        <StatCard label="Time Saved" value={consumptionIdentity?.timeSaved || '0m'} icon={Clock} />
+        <StatCard label="Digital Discipline Rating" value={consumptionIdentity?.rating || 'D'} icon={Gauge} />
       </div>
     </>
   )

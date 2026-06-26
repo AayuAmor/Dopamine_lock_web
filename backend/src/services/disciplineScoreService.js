@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma')
+const { getConsumptionSummary } = require('./consumptionService')
 const { getStreakSummary } = require('./streakService')
 
 const rankBands = [
@@ -208,7 +209,7 @@ async function createSessionScoreEvents(tx, session) {
 }
 
 async function rebuildScoreForUser(userId) {
-  const [sessions, streak] = await Promise.all([
+  const [sessions, streak, consumption] = await Promise.all([
     prisma.missionSession.findMany({
       include: { mission: true },
       orderBy: { endedAt: 'asc' },
@@ -218,6 +219,7 @@ async function rebuildScoreForUser(userId) {
       },
     }),
     getStreakSummary(userId),
+    getConsumptionSummary(userId),
   ])
 
   return prisma.$transaction(async (tx) => {
@@ -243,11 +245,14 @@ async function rebuildScoreForUser(userId) {
       })
     }
 
-    if (sessions.length > 0) {
+    if (sessions.length > 0 && consumption.dailyConsumptionScore >= 80) {
       await tx.disciplineScoreEvent.create({
         data: {
-          description: 'Healthy consumption baseline placeholder',
-          metadata: { placeholder: true },
+          description: 'Healthy consumption maintained',
+          metadata: {
+            consumptionScore: consumption.dailyConsumptionScore,
+            statusText: consumption.statusText,
+          },
           points: 75,
           source: 'HEALTHY_CONSUMPTION',
           userId,
