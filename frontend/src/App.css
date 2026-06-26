@@ -136,6 +136,13 @@
   padding: 18px;
 }
 
+.panel-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  padding: 18px;
+}
+
 .card-head,
 .stat-top,
 .card-row,
@@ -149,6 +156,10 @@
 }
 
 .card h3,
+.panel-section h3,
+.platform-card h3,
+.habit-card h4,
+.future-card h4,
 .compact-row strong,
 .session-card h4,
 .achievement h4 {
@@ -410,6 +421,10 @@ input[type='checkbox'] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.compact-review {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .review-stat {
   display: grid;
   gap: 8px;
@@ -418,6 +433,145 @@ input[type='checkbox'] {
 .review-stat strong {
   color: var(--white);
   font-size: 24px;
+}
+
+.consumption-hero {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 360px);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.consumption-hero > div:first-child {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  padding: 24px;
+}
+
+.consumption-hero h2 {
+  margin: 0;
+  color: var(--white);
+  font-size: clamp(34px, 5vw, 64px);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.daily-score-card strong {
+  color: var(--white);
+  font-size: clamp(38px, 6vw, 58px);
+  line-height: 1;
+}
+
+.platform-grid,
+.habit-grid,
+.quick-action-grid,
+.future-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.platform-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.platform-card,
+.habit-card,
+.future-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #0a0a0a;
+  padding: 14px;
+}
+
+.platform-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.platform-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--white);
+}
+
+.platform-stats {
+  display: grid;
+  gap: 6px;
+  color: var(--grey);
+  font-size: 13px;
+}
+
+.chart-labels {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--dim);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.strict-toggle {
+  margin: 12px 0;
+}
+
+.warning-preview {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #0a0a0a;
+  color: var(--white);
+  padding: 12px;
+}
+
+.awareness-card {
+  padding: 24px;
+}
+
+.awareness-card p {
+  max-width: 880px;
+  color: var(--white);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.habit-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.habit-card {
+  min-height: 116px;
+  align-content: space-between;
+}
+
+.quick-action-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.future-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.future-card {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.danger-text {
+  color: var(--danger);
 }
 
 .splash-screen,
@@ -516,8 +670,17 @@ input[type='checkbox'] {
 
 @media (max-width: 1180px) {
   .stats-grid,
-  .card-grid {
+  .card-grid,
+  .platform-grid,
+  .habit-grid,
+  .quick-action-grid,
+  .future-grid,
+  .compact-review {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .consumption-hero {
+    grid-template-columns: 1fr;
   }
 
   .content-grid.two-one,
@@ -566,6 +729,11 @@ input[type='checkbox'] {
   .card-grid,
   .achievement-grid,
   .review-grid,
+  .platform-grid,
+  .habit-grid,
+  .quick-action-grid,
+  .future-grid,
+  .compact-review,
   .form-grid {
     grid-template-columns: 1fr;
   }

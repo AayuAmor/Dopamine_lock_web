@@ -3,14 +3,19 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   Activity,
   Ban,
+  BookOpen,
   CheckCircle2,
+  Code2,
   Clock,
   Flame,
   Gauge,
   Lock,
   Plus,
+  RefreshCcw,
   ShieldCheck,
+  Smartphone,
   Target,
+  TimerReset,
   Trophy,
 } from 'lucide-react'
 import {
@@ -21,11 +26,13 @@ import {
   CalendarGrid,
   Card,
   ExportButton,
+  FutureFeatureCard,
   GoalCard,
   Input,
   LineChartMock,
   MiniBarChart,
   PageHeader,
+  PlatformUsageCard,
   ProgressBar,
   ReviewStatCard,
   Select,
@@ -37,7 +44,9 @@ import {
   allowedWebsites,
   analytics,
   blockedWebsites,
+  consumptionControl,
   disciplineScore,
+  futureFeatures,
   goals,
   missions,
   monthlyReview,
@@ -150,6 +159,18 @@ export function DashboardPage() {
           </div>
         </Card>
       </div>
+      <Card
+        title="Consumption Overview"
+        label="Create more, consume less"
+        action={<Button variant="secondary" onClick={() => navigate('/consumption-control')}>Manage Consumption</Button>}
+      >
+        <div className="review-grid compact-review">
+          <ReviewStatCard label="Today's Reels" value={consumptionControl.today.reels} />
+          <ReviewStatCard label="Today's Shorts" value={consumptionControl.today.shorts} />
+          <ReviewStatCard label="Time Consumed" value={consumptionControl.today.timeConsumed} />
+          <ReviewStatCard label="Healthy Consumption" value={`${consumptionControl.today.healthyPercent}%`} />
+        </div>
+      </Card>
       <Card title="Recent Sessions" label="Last activity">
         <div className="list-stack">{sessions.slice(0, 3).map((session) => <SessionCard key={session.id} session={session} />)}</div>
       </Card>
@@ -220,6 +241,144 @@ export function ActiveMissionPage() {
         </Card>
       </div>
       <Button variant="danger">End Mission</Button>
+    </>
+  )
+}
+
+export function ConsumptionControlPage() {
+  const navigate = useNavigate()
+  const [limits, setLimits] = useState(consumptionControl.limits)
+  const [strictMode, setStrictMode] = useState(true)
+  const [threshold, setThreshold] = useState('90')
+  const timelineValues = consumptionControl.timeline.map((item) => item.total)
+
+  const updateLimit = (key, value) => {
+    setLimits((current) => ({ ...current, [key]: value }))
+  }
+
+  return (
+    <>
+      <section className="consumption-hero">
+        <div>
+          <p className="eyebrow">Consumption Control</p>
+          <h2>Consumption Control</h2>
+          <p>Track, understand, and limit short-form content before it controls your attention.</p>
+        </div>
+        <Card className="daily-score-card">
+          <p className="eyebrow">Daily Consumption Score</p>
+          <strong>{consumptionControl.score} / 100</strong>
+          <Badge label={consumptionControl.status} />
+        </Card>
+      </section>
+
+      <div className="stats-grid">
+        <StatCard label="Today's Reels" value={consumptionControl.today.reels} icon={Smartphone} />
+        <StatCard label="Today's Shorts" value={consumptionControl.today.shorts} icon={TimerReset} />
+        <StatCard label="Time Consumed" value={consumptionControl.today.timeConsumed} icon={Clock} />
+        <StatCard label="Daily Limit Remaining" value={consumptionControl.today.limitRemaining} icon={ShieldCheck} />
+      </div>
+
+      <section className="panel-section">
+        <div className="card-head">
+          <div>
+            <p className="eyebrow">Short-form sources</p>
+            <h3>Platform Usage</h3>
+          </div>
+        </div>
+        <div className="platform-grid">
+          {consumptionControl.platforms.map((platform) => (
+            <PlatformUsageCard key={platform.id} platform={platform} />
+          ))}
+        </div>
+      </section>
+
+      <div className="content-grid split">
+        <Card title="Consumption Timeline" label="Last 7 days">
+          <LineChartMock values={timelineValues} />
+          <div className="chart-labels">
+            {consumptionControl.timeline.map((item) => (
+              <span key={item.day}>{item.day.slice(0, 3)}</span>
+            ))}
+          </div>
+        </Card>
+        <Card title="Daily Limit Manager" label="Frontend controls">
+          <div className="form-grid">
+            <Input label="Maximum reels per day" type="number" value={limits.reels} onChange={(event) => updateLimit('reels', event.target.value)} />
+            <Input label="Maximum shorts per day" type="number" value={limits.shorts} onChange={(event) => updateLimit('shorts', event.target.value)} />
+            <Input label="Maximum TikTok videos" type="number" value={limits.tiktok} onChange={(event) => updateLimit('tiktok', event.target.value)} />
+            <Input label="Maximum total watch time" type="number" value={limits.watchTime} onChange={(event) => updateLimit('watchTime', event.target.value)} />
+          </div>
+          <label className="compact-row strict-toggle">
+            <span>Strict Lock Mode</span>
+            <input type="checkbox" checked={strictMode} onChange={(event) => setStrictMode(event.target.checked)} />
+          </label>
+          {strictMode && (
+            <p className="muted-text">When your limit is reached, Dopamine Lock blocks further access until tomorrow.</p>
+          )}
+        </Card>
+      </div>
+
+      <div className="content-grid split">
+        <Card title="Warning Threshold" label="Limit alerts">
+          <Select label="Choose threshold" value={threshold} onChange={(event) => setThreshold(event.target.value)}>
+            <option value="50">50%</option>
+            <option value="75">75%</option>
+            <option value="90">90%</option>
+            <option value="100">100%</option>
+          </Select>
+          <p className="warning-preview">You have consumed {threshold}% of today's reel limit.</p>
+        </Card>
+        <Card title="Weekly Analytics" label="Consumption reduction">
+          <div className="review-grid compact-review">
+            <ReviewStatCard label="Average Daily Consumption" value={consumptionControl.weekly.averageDailyConsumption} />
+            <ReviewStatCard label="Videos Avoided" value={consumptionControl.weekly.videosAvoided} />
+            <ReviewStatCard label="Estimated Time Saved" value={consumptionControl.weekly.estimatedTimeSaved} />
+            <ReviewStatCard label="Focus Hours Gained" value={consumptionControl.weekly.focusHoursGained} />
+          </div>
+        </Card>
+      </div>
+
+      <Card title="Dopamine Awareness" label="Educational brief" className="awareness-card">
+        <p>
+          Short-form content trains the brain to seek constant novelty. Reducing excessive
+          consumption improves focus, memory, discipline, and deep work by lowering the demand for
+          rapid reward switching.
+        </p>
+      </Card>
+
+      <Card title="Healthy Habits Suggestions" label="Instead of watching reels">
+        <div className="habit-grid">
+          {[
+            { label: 'Read 10 pages', icon: BookOpen },
+            { label: 'Take a short walk', icon: Activity },
+            { label: 'Complete a Focus Mission', icon: Target },
+            { label: 'Review notes', icon: CheckCircle2 },
+            { label: 'Continue coding', icon: Code2 },
+          ].map(({ label, icon: Icon }) => (
+            <article className="habit-card" key={label}>
+              <Icon size={20} />
+              <h4>{label}</h4>
+            </article>
+          ))}
+        </div>
+      </Card>
+
+      <Card title="Quick Actions" label="Control commands">
+        <div className="quick-action-grid">
+          <Button onClick={() => navigate('/mission-center')}>Start Focus Mission</Button>
+          <Button variant="secondary" onClick={() => navigate('/block-manager')}>Manage Website Blocking</Button>
+          <Button variant="secondary" onClick={() => navigate('/analytics')}>View Analytics</Button>
+          <Button variant="danger"><RefreshCcw size={15} />Reset Daily Limits</Button>
+        </div>
+      </Card>
+
+      <Card title="Future Modules" label="Coming Soon">
+        <div className="future-grid">
+          {futureFeatures.map((feature) => (
+            <FutureFeatureCard key={feature} title={feature} />
+          ))}
+        </div>
+      </Card>
     </>
   )
 }
@@ -343,6 +502,16 @@ export function DisciplineScorePage() {
           <div className="list-stack">{disciplineScore.breakdown.map((item) => <div key={item.label}><div className="card-row"><span>{item.label}</span><strong>{item.value}%</strong></div><ProgressBar value={item.value} /></div>)}</div>
         </Card>
       </div>
+      <Card title="Consumption Control" label="Score category">
+        <div className="list-stack">
+          {disciplineScore.categories.map((category) => (
+            <div className="compact-row" key={category.label}>
+              <span>{category.label}</span>
+              <strong className={category.danger ? 'danger-text' : ''}>{category.value}</strong>
+            </div>
+          ))}
+        </div>
+      </Card>
       <Card title="7-Day Score Trend" label="Momentum"><LineChartMock values={analytics.scoreTrend} /></Card>
       <Card title="Achievement Badges" label="Identity shift message"><p className="identity-message">You are becoming the person who keeps promises under resistance.</p></Card>
     </>
@@ -362,6 +531,21 @@ export function AnalyticsPage() {
         <StatCard label="Total Sessions" value={analytics.totalSessions} icon={Target} />
       </div>
       <Card title="Focus Hours Chart" label="Last 7 days"><MiniBarChart values={analytics.focusHours} /></Card>
+      <section className="panel-section">
+        <div className="card-head">
+          <div>
+            <p className="eyebrow">Create more, consume less</p>
+            <h3>Consumption Analytics</h3>
+          </div>
+        </div>
+        <div className="content-grid split">
+          <Card title="Weekly Reels" label="Videos"><MiniBarChart values={analytics.weeklyReels} /></Card>
+          <Card title="Weekly Shorts" label="Videos"><MiniBarChart values={analytics.weeklyShorts} /></Card>
+          <Card title="Time Saved" label="Avoided consumption"><LineChartMock values={analytics.consumptionTrend} /></Card>
+          <Card title="Consumption Trend" label="Last 7 days"><LineChartMock values={analytics.consumptionTrend} /></Card>
+          <Card title="Platform Breakdown" label="Share of consumption"><MiniBarChart values={analytics.platformBreakdown} /></Card>
+        </div>
+      </section>
     </>
   )
 }
@@ -439,6 +623,10 @@ export function IdentityPage() {
         <StatCard label="Deep Work Hours" value="286h" icon={Clock} />
         <StatCard label="Current Streak" value="12 days" icon={Flame} />
         <StatCard label="Resistance Events" value="247" icon={ShieldCheck} />
+        <StatCard label="Healthy Consumption Days" value={consumptionControl.identityStats.healthyDays} icon={ShieldCheck} />
+        <StatCard label="Videos Avoided" value={consumptionControl.identityStats.videosAvoided} icon={Ban} />
+        <StatCard label="Time Saved" value={consumptionControl.identityStats.timeSaved} icon={Clock} />
+        <StatCard label="Digital Discipline Rating" value={consumptionControl.identityStats.rating} icon={Gauge} />
       </div>
     </>
   )

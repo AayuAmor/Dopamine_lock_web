@@ -5,7 +5,7 @@ import {
   Blocks,
   CalendarDays,
   ChevronRight,
-  CircleHelp,
+  Clapperboard,
   Crosshair,
   Download,
   Flag,
@@ -20,25 +20,26 @@ import {
   Target,
   Trophy,
   User,
+  Video,
 } from 'lucide-react'
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: Home },
   { label: 'Mission Center', path: '/mission-center', icon: Target },
   { label: 'Active Mission', path: '/active-mission', icon: Crosshair },
+  { label: 'Consumption Control', path: '/consumption-control', icon: Clapperboard },
   { label: 'Block Manager', path: '/block-manager', icon: Blocks },
   { label: 'Session History', path: '/session-history', icon: History },
   { label: 'Streak Calendar', path: '/streak-calendar', icon: CalendarDays },
   { label: 'Discipline Score', path: '/discipline-score', icon: Gauge },
   { label: 'Analytics', path: '/analytics', icon: BarChart3 },
-  { label: 'Achievements', path: '/achievements', icon: Trophy },
   { label: 'Goals Hub', path: '/goals', icon: Goal },
+  { label: 'Achievements', path: '/achievements', icon: Trophy },
   { label: 'Weekly Review', path: '/weekly-review', icon: Flag },
   { label: 'Monthly Review', path: '/monthly-review', icon: Activity },
   { label: 'Identity', path: '/identity', icon: User },
   { label: 'Browser Extension', path: '/browser-extension', icon: MonitorCheck },
   { label: 'Settings', path: '/settings', icon: Settings },
-  { label: 'Help & Support', path: '/help', icon: CircleHelp },
 ]
 
 export function AppLayout({ children }) {
@@ -242,6 +243,40 @@ export function GoalCard({ goal }) {
         <strong>{goal.progress}%</strong>
       </div>
     </Card>
+  )
+}
+
+export function PlatformUsageCard({ platform }) {
+  const tone = platform.status === 'Limit Reached' ? 'danger' : platform.status === 'Warning' ? 'muted' : 'default'
+
+  return (
+    <article className="platform-card">
+      <div className="platform-head">
+        <div className="platform-icon">
+          <Video size={20} />
+        </div>
+        <div>
+          <p className="eyebrow">Platform usage</p>
+          <h3>{platform.name}</h3>
+        </div>
+      </div>
+      <div className="platform-stats">
+        <span>{platform.videos} videos watched</span>
+        <span>{platform.minutes} minutes spent</span>
+        <span>Daily limit {platform.limit}</span>
+      </div>
+      <ProgressBar value={platform.progress} />
+      <Badge label={platform.status} tone={tone} />
+    </article>
+  )
+}
+
+export function FutureFeatureCard({ title }) {
+  return (
+    <article className="future-card" aria-disabled="true">
+      <Badge label="Coming Soon" tone="muted" />
+      <h4>{title}</h4>
+    </article>
   )
 }
 
