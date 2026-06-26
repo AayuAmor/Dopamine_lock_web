@@ -19,6 +19,13 @@ enum MissionStatus {
   Archived
 }
 
+enum MissionSessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ABANDONED
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   fullName     String   @map("full_name") @db.VarChar(120)
@@ -34,6 +41,7 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   missions     Mission[]
+  missionSessions MissionSession[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
@@ -56,12 +64,45 @@ model Mission {
   status              MissionStatus     @default(Ready)
   favorite            Boolean           @default(false)
   archived            Boolean           @default(false)
+  sessionCount        Int               @default(0) @map("session_count")
+  completedSessionCount Int             @default(0) @map("completed_session_count")
+  abandonedSessionCount Int             @default(0) @map("abandoned_session_count")
+  lastStartedAt       DateTime?         @map("last_started_at") @db.Timestamptz(6)
+  lastCompletedAt     DateTime?         @map("last_completed_at") @db.Timestamptz(6)
   createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions            MissionSession[]
 
   @@index([userId], map: "idx_missions_user_id")
   @@index([userId, archived], map: "idx_missions_user_archived")
   @@index([userId, favorite], map: "idx_missions_user_favorite")
   @@map("missions")
+}
+
+model MissionSession {
+  id                   Int                  @id @default(autoincrement())
+  userId               Int                  @map("user_id")
+  missionId            Int                  @map("mission_id")
+  startedAt            DateTime             @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt              DateTime?            @map("ended_at") @db.Timestamptz(6)
+  pausedAt             DateTime?            @map("paused_at") @db.Timestamptz(6)
+  totalPausedSeconds   Int                  @default(0) @map("total_paused_seconds")
+  elapsedSeconds       Int                  @default(0) @map("elapsed_seconds")
+  remainingSeconds     Int                  @default(0) @map("remaining_seconds")
+  completionPercentage Int                  @default(0) @map("completion_percentage")
+  status               MissionSessionStatus @default(ACTIVE)
+  completed            Boolean              @default(false)
+  abandoned            Boolean              @default(false)
+  notes                String?              @db.VarChar(1000)
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission              Mission              @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_mission_sessions_user_id")
+  @@index([missionId], map: "idx_mission_sessions_mission_id")
+  @@index([userId, status], map: "idx_mission_sessions_user_status")
+  @@index([userId, startedAt], map: "idx_mission_sessions_user_started_at")
+  @@map("mission_sessions")
 }

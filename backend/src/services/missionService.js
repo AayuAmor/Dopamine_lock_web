@@ -24,6 +24,11 @@ function formatMission(mission) {
     status: mission.status,
     favorite: mission.favorite,
     archived: mission.archived,
+    sessionCount: mission.sessionCount,
+    completedSessionCount: mission.completedSessionCount,
+    abandonedSessionCount: mission.abandonedSessionCount,
+    lastStartedAt: mission.lastStartedAt,
+    lastCompletedAt: mission.lastCompletedAt,
     createdAt: mission.createdAt,
     updatedAt: mission.updatedAt,
   }

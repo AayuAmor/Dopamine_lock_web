@@ -4,6 +4,7 @@ const cors = require('cors')
 const express = require('express')
 const path = require('path')
 const authRoutes = require('./src/routes/authRoutes')
+const missionSessionRoutes = require('./src/routes/missionSessionRoutes')
 const missionRoutes = require('./src/routes/missionRoutes')
 const profileRoutes = require('./src/routes/profileRoutes')
 
@@ -36,6 +37,7 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/auth', authRoutes)
+app.use('/api/mission-session', missionSessionRoutes)
 app.use('/api/missions', missionRoutes)
 app.use('/api/profile', profileRoutes)
 
