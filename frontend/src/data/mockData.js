@@ -1,33 +1,3 @@
-export const missions = [
-  {
-    id: 1,
-    name: 'Deep Work: DSA Blocks',
-    goal: 'Complete graph traversal drills',
-    duration: '90 min',
-    difficulty: 'Hard',
-    progress: 68,
-    status: 'Active',
-  },
-  {
-    id: 2,
-    name: 'Project Build Sprint',
-    goal: 'Ship dashboard shell',
-    duration: '120 min',
-    difficulty: 'Medium',
-    progress: 100,
-    status: 'Completed',
-  },
-  {
-    id: 3,
-    name: 'Reading Lock',
-    goal: 'Read 30 pages without phone checks',
-    duration: '45 min',
-    difficulty: 'Easy',
-    progress: 40,
-    status: 'Template',
-  },
-]
-
 export const sessions = [
   {
     id: 1,
@@ -81,14 +51,14 @@ export const allowedWebsites = [
 ]
 
 export const goals = [
-  { id: 1, title: 'Master DSA', progress: 64, missions: 18 },
-  { id: 2, title: 'Build Projects', progress: 48, missions: 12 },
-  { id: 3, title: 'Read 12 Books', progress: 35, missions: 9 },
-  { id: 4, title: 'Improve Consistency', progress: 76, missions: 24 },
-  { id: 5, title: 'Reduce Instagram Reels', progress: 58, missions: 7 },
-  { id: 6, title: 'Reduce Shorts', progress: 62, missions: 8 },
-  { id: 7, title: 'Digital Detox', progress: 41, missions: 5 },
-  { id: 8, title: 'Less than 30 reels/day', progress: 73, missions: 11 },
+  { id: 1, title: 'Master DSA', progress: 64 },
+  { id: 2, title: 'Build Projects', progress: 48 },
+  { id: 3, title: 'Read 12 Books', progress: 35 },
+  { id: 4, title: 'Improve Consistency', progress: 76 },
+  { id: 5, title: 'Reduce Instagram Reels', progress: 58 },
+  { id: 6, title: 'Reduce Shorts', progress: 62 },
+  { id: 7, title: 'Digital Detox', progress: 41 },
+  { id: 8, title: 'Less than 30 reels/day', progress: 73 },
 ]
 
 export const achievements = [

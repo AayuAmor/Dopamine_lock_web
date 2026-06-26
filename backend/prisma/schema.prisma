@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum MissionDifficulty {
+  Easy
+  Medium
+  Hard
+}
+
+enum MissionStatus {
+  Draft
+  Ready
+  Archived
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   fullName     String   @map("full_name") @db.VarChar(120)
@@ -21,7 +33,35 @@ model User {
   role         String   @default("user") @db.VarChar(50)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  missions     Mission[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
+}
+
+model Mission {
+  id                  Int               @id @default(autoincrement())
+  userId              Int               @map("user_id")
+  title               String            @db.VarChar(140)
+  goal                String            @db.VarChar(220)
+  description         String?           @db.VarChar(1000)
+  durationMinutes     Int               @map("duration_minutes")
+  difficulty          MissionDifficulty
+  strictMode          Boolean           @default(true) @map("strict_mode")
+  blockNotifications  Boolean           @default(true) @map("block_notifications")
+  preventTabSwitching Boolean           @default(true) @map("prevent_tab_switching")
+  blockedWebsites     Json              @default("[]") @map("blocked_websites")
+  allowedWebsites     Json              @default("[]") @map("allowed_websites")
+  blockedCategories   Json              @default("[]") @map("blocked_categories")
+  status              MissionStatus     @default(Ready)
+  favorite            Boolean           @default(false)
+  archived            Boolean           @default(false)
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_missions_user_id")
+  @@index([userId, archived], map: "idx_missions_user_archived")
+  @@index([userId, favorite], map: "idx_missions_user_favorite")
+  @@map("missions")
 }

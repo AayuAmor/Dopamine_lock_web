@@ -4,6 +4,7 @@ const cors = require('cors')
 const express = require('express')
 const path = require('path')
 const authRoutes = require('./src/routes/authRoutes')
+const missionRoutes = require('./src/routes/missionRoutes')
 const profileRoutes = require('./src/routes/profileRoutes')
 
 const app = express()
@@ -35,6 +36,7 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/auth', authRoutes)
+app.use('/api/missions', missionRoutes)
 app.use('/api/profile', profileRoutes)
 
 app.use((req, res) => {

@@ -289,6 +289,10 @@
   gap: 12px;
 }
 
+.form-span-full {
+  grid-column: 1 / -1;
+}
+
 .form-stack,
 .button-stack,
 .list-stack,
@@ -484,6 +488,47 @@ input[type='checkbox'] {
 .auth-card {
   display: grid;
   gap: 14px;
+}
+
+.mission-controls {
+  margin-bottom: 14px;
+}
+
+.mission-list-item {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #0a0a0a;
+  padding: 12px;
+}
+
+.mission-list-main,
+.mission-list-meta,
+.mission-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mission-list-main strong {
+  display: block;
+  color: var(--white);
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.mission-list-main span,
+.mission-list-main p,
+.mission-list-meta {
+  color: var(--grey);
+  font-size: 12px;
+}
+
+.mission-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
 
 .mission-hero strong,
