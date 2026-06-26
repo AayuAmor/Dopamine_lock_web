@@ -39,6 +39,7 @@ import {
   SessionCard,
   StatCard,
 } from '../components'
+import { useAuth } from '../context/useAuth'
 import {
   achievements,
   allowedWebsites,
@@ -57,6 +58,31 @@ import {
 
 const missionRules = ['Strict mode', 'Block all notifications', 'Prevent tab switching']
 const categories = ['Social', 'Video', 'Forums', 'News', 'Gaming', 'Shopping']
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function validateAuthFields(fields, requireName = false) {
+  if (requireName && !fields.fullName.trim()) {
+    return 'Full name is required'
+  }
+
+  if (!fields.email.trim() || !fields.password) {
+    return 'Email and password are required'
+  }
+
+  if (!emailPattern.test(fields.email.trim())) {
+    return 'Enter a valid email address'
+  }
+
+  if (fields.password.length < 6) {
+    return 'Password must be at least 6 characters'
+  }
+
+  if (requireName && fields.password !== fields.confirmPassword) {
+    return 'Passwords do not match'
+  }
+
+  return ''
+}
 
 export function SplashPage() {
   return (
@@ -86,12 +112,42 @@ export function SplashPage() {
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { login } = useAuth()
+  const [form, setForm] = useState({ email: '', password: '' })
+  const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    const validationError = validateAuthFields(form)
+
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
+    try {
+      setError('')
+      setIsSubmitting(true)
+      await login({ email: form.email, password: form.password })
+      navigate('/dashboard', { replace: true })
+    } catch (authError) {
+      setError(authError.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
-    <AuthShell title="Login" subtitle="Return to the operating system.">
-      <Input label="Email" type="email" placeholder="operator@dopaminelock.app" />
-      <Input label="Password" type="password" placeholder="Password" />
-      <Button onClick={() => navigate('/dashboard')}>Login</Button>
+    <AuthShell title="Login" subtitle="Return to the operating system." onSubmit={handleSubmit}>
+      {error && <p className="form-error">{error}</p>}
+      <Input label="Email" type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} placeholder="operator@dopaminelock.app" />
+      <Input label="Password" type="password" value={form.password} onChange={(event) => updateField('password', event.target.value)} placeholder="Password" />
+      <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Logging In' : 'Login'}</Button>
       <div className="auth-links">
         <Link to="/login">Forgot password</Link>
         <Link to="/register">Sign up</Link>
@@ -102,14 +158,48 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const { register } = useAuth()
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '' })
+  const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    const validationError = validateAuthFields(form, true)
+
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
+    try {
+      setError('')
+      setIsSubmitting(true)
+      await register({
+        fullName: form.fullName,
+        email: form.email,
+        password: form.password,
+      })
+      navigate('/dashboard', { replace: true })
+    } catch (authError) {
+      setError(authError.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
-    <AuthShell title="Create Account" subtitle="Build a disciplined control profile.">
-      <Input label="Full name" placeholder="Full name" />
-      <Input label="Email" type="email" placeholder="operator@dopaminelock.app" />
-      <Input label="Password" type="password" placeholder="Password" />
-      <Input label="Confirm password" type="password" placeholder="Confirm password" />
-      <Button onClick={() => navigate('/dashboard')}>Create Account</Button>
+    <AuthShell title="Create Account" subtitle="Build a disciplined control profile." onSubmit={handleSubmit}>
+      {error && <p className="form-error">{error}</p>}
+      <Input label="Full name" value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} placeholder="Full name" />
+      <Input label="Email" type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} placeholder="operator@dopaminelock.app" />
+      <Input label="Password" type="password" value={form.password} onChange={(event) => updateField('password', event.target.value)} placeholder="Password" />
+      <Input label="Confirm password" type="password" value={form.confirmPassword} onChange={(event) => updateField('confirmPassword', event.target.value)} placeholder="Confirm password" />
+      <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Creating Account' : 'Create Account'}</Button>
       <div className="auth-links">
         <Link to="/login">Login</Link>
       </div>
@@ -117,29 +207,30 @@ export function RegisterPage() {
   )
 }
 
-function AuthShell({ title, subtitle, children }) {
+function AuthShell({ title, subtitle, children, onSubmit }) {
   return (
     <main className="auth-screen">
       <Link className="brand-lock auth-brand" to="/">Dopamine Lock</Link>
-      <section className="auth-card">
+      <form className="auth-card" onSubmit={onSubmit}>
         <p className="eyebrow">Access</p>
         <h1>{title}</h1>
         <p>{subtitle}</p>
         <div className="form-stack">{children}</div>
-      </section>
+      </form>
     </main>
   )
 }
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   return (
     <>
       <PageHeader
         eyebrow="Daily Command"
         title="Discipline Dashboard"
-        description="Track the mission, protect attention, and keep the streak intact."
+        description={`Welcome back, ${user?.fullName || 'Operator'}. Track the mission, protect attention, and keep the streak intact.`}
       />
       <div className="stats-grid">
         <StatCard label="Current Mission" value="68%" meta="Deep Work: DSA Blocks" icon={Target} />

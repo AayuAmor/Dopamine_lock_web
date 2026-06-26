@@ -77,6 +77,14 @@
   font-size: 20px;
 }
 
+.topbar-user {
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .topbar-status,
 .badge-row,
 .splash-actions,
@@ -257,6 +265,11 @@ input[type='checkbox'] {
   padding: 0 16px;
   text-decoration: none;
   text-transform: uppercase;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .button-primary {
@@ -665,6 +678,26 @@ input[type='checkbox'] {
   color: var(--grey);
   font-size: 12px;
   font-weight: 800;
+  text-transform: uppercase;
+}
+
+.form-error {
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+.route-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: var(--bg);
+  color: var(--grey);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 

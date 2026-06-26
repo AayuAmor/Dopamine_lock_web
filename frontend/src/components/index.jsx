@@ -22,6 +22,7 @@ import {
   User,
   Video,
 } from 'lucide-react'
+import { useAuth } from '../context/useAuth'
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: Home },
@@ -76,6 +77,7 @@ export function Sidebar() {
 export function Topbar() {
   const location = useLocation()
   const current = navItems.find((item) => item.path === location.pathname)
+  const { logout, user } = useAuth()
 
   return (
     <header className="topbar">
@@ -84,8 +86,9 @@ export function Topbar() {
         <h1>{current?.label || 'Dopamine Lock'}</h1>
       </div>
       <div className="topbar-status">
+        {user && <span className="topbar-user">{user.fullName}</span>}
         <Badge label="Strict Mode" />
-        <Badge label="Synced" tone="muted" />
+        <Button variant="secondary" onClick={logout}>Logout</Button>
       </div>
     </header>
   )

@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components'
+import { AuthProvider } from './context/AuthContext'
 import {
   AchievementsPage,
   ActiveMissionPage,
@@ -22,6 +23,7 @@ import {
   StreakCalendarPage,
   WeeklyReviewPage,
 } from './pages'
+import { ProtectedRoute, PublicOnlyRoute } from './routes/ProtectedRoute'
 import './App.css'
 
 const dashboardRoutes = [
@@ -46,21 +48,27 @@ const dashboardRoutes = [
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<SplashPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        {dashboardRoutes.map((route) => (
-          <Route
-            key={route.path}
-            path={route.path}
-            element={<AppLayout>{route.element}</AppLayout>}
-          />
-        ))}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<SplashPage />} />
+          <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+          <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
+          {dashboardRoutes.map((route) => (
+            <Route
+              key={route.path}
+              path={route.path}
+              element={
+                <ProtectedRoute>
+                  <AppLayout>{route.element}</AppLayout>
+                </ProtectedRoute>
+              }
+            />
+          ))}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 
