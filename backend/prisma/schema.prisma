@@ -49,55 +49,68 @@ enum BlockRuleSource {
   MISSION
 }
 
+enum DisciplineScoreEventSource {
+  MISSION_COMPLETION
+  MISSION_ABANDONED
+  FOCUS_DURATION
+  STREAK_BONUS
+  BLOCK_RESISTANCE
+  HEALTHY_CONSUMPTION
+  MANUAL_RECALCULATION
+}
+
 model User {
-  id           Int      @id @default(autoincrement())
-  fullName     String   @map("full_name") @db.VarChar(120)
-  email        String   @unique @db.VarChar(255)
-  passwordHash String   @map("password_hash")
-  bio          String?  @db.VarChar(500)
-  avatarUrl    String?  @map("avatar_url")
-  timezone     String   @default("Asia/Kathmandu") @db.VarChar(80)
-  dailyFocusGoal Int    @default(4) @map("daily_focus_goal")
-  preferredMissionDuration Int @default(50) @map("preferred_mission_duration")
-  disciplineTitle String @default("DISCIPLINED BUILDER") @map("discipline_title") @db.VarChar(80)
-  role         String   @default("user") @db.VarChar(50)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  missions     Mission[]
-  missionSessions MissionSession[]
-  blockRules   BlockRule[]
-  userPresetBlockLists UserPresetBlockList[]
+  id                       Int                       @id @default(autoincrement())
+  fullName                 String                    @map("full_name") @db.VarChar(120)
+  email                    String                    @unique @db.VarChar(255)
+  passwordHash             String                    @map("password_hash")
+  bio                      String?                   @db.VarChar(500)
+  avatarUrl                String?                   @map("avatar_url")
+  timezone                 String                    @default("Asia/Kathmandu") @db.VarChar(80)
+  dailyFocusGoal           Int                       @default(4) @map("daily_focus_goal")
+  preferredMissionDuration Int                       @default(50) @map("preferred_mission_duration")
+  disciplineTitle          String                    @default("DISCIPLINED BUILDER") @map("discipline_title") @db.VarChar(80)
+  role                     String                    @default("user") @db.VarChar(50)
+  createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  missions                 Mission[]
+  missionSessions          MissionSession[]
+  blockRules               BlockRule[]
+  userPresetBlockLists     UserPresetBlockList[]
+  disciplineScore          DisciplineScore?
+  disciplineScoreEvents    DisciplineScoreEvent[]
+  disciplineScoreSnapshots DisciplineScoreSnapshot[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
 }
 
 model Mission {
-  id                  Int               @id @default(autoincrement())
-  userId              Int               @map("user_id")
-  title               String            @db.VarChar(140)
-  goal                String            @db.VarChar(220)
-  description         String?           @db.VarChar(1000)
-  durationMinutes     Int               @map("duration_minutes")
-  difficulty          MissionDifficulty
-  strictMode          Boolean           @default(true) @map("strict_mode")
-  blockNotifications  Boolean           @default(true) @map("block_notifications")
-  preventTabSwitching Boolean           @default(true) @map("prevent_tab_switching")
-  blockedWebsites     Json              @default("[]") @map("blocked_websites")
-  allowedWebsites     Json              @default("[]") @map("allowed_websites")
-  blockedCategories   Json              @default("[]") @map("blocked_categories")
-  status              MissionStatus     @default(Ready)
-  favorite            Boolean           @default(false)
-  archived            Boolean           @default(false)
-  sessionCount        Int               @default(0) @map("session_count")
-  completedSessionCount Int             @default(0) @map("completed_session_count")
-  abandonedSessionCount Int             @default(0) @map("abandoned_session_count")
-  lastStartedAt       DateTime?         @map("last_started_at") @db.Timestamptz(6)
-  lastCompletedAt     DateTime?         @map("last_completed_at") @db.Timestamptz(6)
-  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sessions            MissionSession[]
+  id                    Int               @id @default(autoincrement())
+  userId                Int               @map("user_id")
+  title                 String            @db.VarChar(140)
+  goal                  String            @db.VarChar(220)
+  description           String?           @db.VarChar(1000)
+  durationMinutes       Int               @map("duration_minutes")
+  difficulty            MissionDifficulty
+  strictMode            Boolean           @default(true) @map("strict_mode")
+  blockNotifications    Boolean           @default(true) @map("block_notifications")
+  preventTabSwitching   Boolean           @default(true) @map("prevent_tab_switching")
+  blockedWebsites       Json              @default("[]") @map("blocked_websites")
+  allowedWebsites       Json              @default("[]") @map("allowed_websites")
+  blockedCategories     Json              @default("[]") @map("blocked_categories")
+  status                MissionStatus     @default(Ready)
+  favorite              Boolean           @default(false)
+  archived              Boolean           @default(false)
+  sessionCount          Int               @default(0) @map("session_count")
+  completedSessionCount Int               @default(0) @map("completed_session_count")
+  abandonedSessionCount Int               @default(0) @map("abandoned_session_count")
+  lastStartedAt         DateTime?         @map("last_started_at") @db.Timestamptz(6)
+  lastCompletedAt       DateTime?         @map("last_completed_at") @db.Timestamptz(6)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions              MissionSession[]
 
   @@index([userId], map: "idx_missions_user_id")
   @@index([userId, archived], map: "idx_missions_user_archived")
@@ -106,31 +119,32 @@ model Mission {
 }
 
 model MissionSession {
-  id                   Int                  @id @default(autoincrement())
-  userId               Int                  @map("user_id")
-  missionId            Int                  @map("mission_id")
-  startedAt            DateTime             @default(now()) @map("started_at") @db.Timestamptz(6)
-  endedAt              DateTime?            @map("ended_at") @db.Timestamptz(6)
-  completedAt          DateTime?            @map("completed_at") @db.Timestamptz(6)
-  pausedAt             DateTime?            @map("paused_at") @db.Timestamptz(6)
-  totalPausedSeconds   Int                  @default(0) @map("total_paused_seconds")
-  elapsedSeconds       Int                  @default(0) @map("elapsed_seconds")
-  remainingSeconds     Int                  @default(0) @map("remaining_seconds")
-  completionPercentage Int                  @default(0) @map("completion_percentage")
-  actualDurationMinutes Int?                @map("actual_duration_minutes")
-  plannedDurationMinutes Int?               @map("planned_duration_minutes")
-  focusPercentage       Int?                @map("focus_percentage")
-  interruptionCount     Int                 @default(0) @map("interruption_count")
-  blockedWebsitesCount  Int                 @default(0) @map("blocked_websites_count")
-  completionReason      String?             @map("completion_reason") @db.VarChar(120)
-  status               MissionSessionStatus @default(ACTIVE)
-  completed            Boolean              @default(false)
-  abandoned            Boolean              @default(false)
-  notes                String?              @db.VarChar(1000)
-  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mission              Mission              @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  id                     Int                    @id @default(autoincrement())
+  userId                 Int                    @map("user_id")
+  missionId              Int                    @map("mission_id")
+  startedAt              DateTime               @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt                DateTime?              @map("ended_at") @db.Timestamptz(6)
+  completedAt            DateTime?              @map("completed_at") @db.Timestamptz(6)
+  pausedAt               DateTime?              @map("paused_at") @db.Timestamptz(6)
+  totalPausedSeconds     Int                    @default(0) @map("total_paused_seconds")
+  elapsedSeconds         Int                    @default(0) @map("elapsed_seconds")
+  remainingSeconds       Int                    @default(0) @map("remaining_seconds")
+  completionPercentage   Int                    @default(0) @map("completion_percentage")
+  actualDurationMinutes  Int?                   @map("actual_duration_minutes")
+  plannedDurationMinutes Int?                   @map("planned_duration_minutes")
+  focusPercentage        Int?                   @map("focus_percentage")
+  interruptionCount      Int                    @default(0) @map("interruption_count")
+  blockedWebsitesCount   Int                    @default(0) @map("blocked_websites_count")
+  completionReason       String?                @map("completion_reason") @db.VarChar(120)
+  status                 MissionSessionStatus   @default(ACTIVE)
+  completed              Boolean                @default(false)
+  abandoned              Boolean                @default(false)
+  notes                  String?                @db.VarChar(1000)
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission                Mission                @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  disciplineScoreEvents  DisciplineScoreEvent[]
 
   @@index([userId], map: "idx_mission_sessions_user_id")
   @@index([missionId], map: "idx_mission_sessions_mission_id")
@@ -162,14 +176,14 @@ model BlockRule {
 }
 
 model PresetBlockList {
-  id        Int                   @id @default(autoincrement())
-  name      String                @unique @db.VarChar(120)
-  description String?             @db.VarChar(500)
-  category  BlockCategory
-  websites  Json                  @default("[]")
-  active    Boolean               @default(true)
-  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          Int                   @id @default(autoincrement())
+  name        String                @unique @db.VarChar(120)
+  description String?               @db.VarChar(500)
+  category    BlockCategory
+  websites    Json                  @default("[]")
+  active      Boolean               @default(true)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
   userPresets UserPresetBlockList[]
 
   @@index([active], map: "idx_preset_block_lists_active")
@@ -189,4 +203,52 @@ model UserPresetBlockList {
   @@unique([userId, presetBlockListId], map: "user_preset_block_lists_user_preset_key")
   @@index([userId, enabled], map: "idx_user_preset_block_lists_user_enabled")
   @@map("user_preset_block_lists")
+}
+
+model DisciplineScore {
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @unique @map("user_id")
+  totalXp            Int      @default(0) @map("total_xp")
+  currentRank        String   @default("D") @map("current_rank") @db.VarChar(20)
+  nextRank           String?  @map("next_rank") @db.VarChar(20)
+  progressToNextRank Int      @default(0) @map("progress_to_next_rank")
+  lastCalculatedAt   DateTime @default(now()) @map("last_calculated_at") @db.Timestamptz(6)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_discipline_scores_user_id")
+  @@map("discipline_scores")
+}
+
+model DisciplineScoreEvent {
+  id               Int                        @id @default(autoincrement())
+  userId           Int                        @map("user_id")
+  missionSessionId Int?                       @map("mission_session_id")
+  source           DisciplineScoreEventSource
+  points           Int
+  description      String                     @db.VarChar(255)
+  metadata         Json                       @default("{}")
+  createdAt        DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missionSession   MissionSession?            @relation(fields: [missionSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([source, missionSessionId], map: "discipline_score_events_source_session_key")
+  @@index([userId], map: "idx_discipline_score_events_user_id")
+  @@index([userId, createdAt], map: "idx_discipline_score_events_user_created_at")
+  @@map("discipline_score_events")
+}
+
+model DisciplineScoreSnapshot {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  score     Int
+  rank      String   @db.VarChar(20)
+  date      DateTime @db.Date
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date], map: "discipline_score_snapshots_user_date_key")
+  @@index([userId, date], map: "idx_discipline_score_snapshots_user_date")
+  @@map("discipline_score_snapshots")
 }

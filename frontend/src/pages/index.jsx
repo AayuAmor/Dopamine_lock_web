@@ -51,13 +51,13 @@ import {
   achievements,
   analytics,
   consumptionControl,
-  disciplineScore,
   futureFeatures,
   goals,
   monthlyReview,
   weeklyReview,
 } from '../data/mockData'
 import { useBlockManager } from '../hooks/useBlockManager'
+import { useDisciplineScore } from '../hooks/useDisciplineScore'
 import { useMissions } from '../hooks/useMissions'
 import { useMissionSession } from '../hooks/useMissionSession'
 import { useSessionHistory } from '../hooks/useSessionHistory'
@@ -69,6 +69,7 @@ import {
   enablePreset,
   toggleRule as toggleBlockRule,
 } from '../services/blockManagerService'
+import { recalculateScore } from '../services/disciplineScoreService'
 import {
   archiveMission,
   createMission,
@@ -112,6 +113,7 @@ const missionFilters = ['All', 'Favorites', 'Archived', 'Easy', 'Medium', 'Hard'
 const missionSorts = ['Newest', 'Oldest', 'Alphabetical', 'Duration', 'Difficulty']
 const sessionFilters = ['All', 'Completed', 'Abandoned', 'Today', 'This Week', 'This Month']
 const sessionSorts = ['Newest', 'Oldest', 'Duration', 'Completion Time', 'Mission Name']
+const disciplineRankLadder = ['D', 'C', 'B', 'A', 'S', 'S+']
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const bioLimit = 500
 const avatarMaxSize = 2 * 1024 * 1024
@@ -215,6 +217,26 @@ function formatDateTime(value) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value))
+}
+
+function identityTitleFromRank(rank) {
+  if (rank === 'S+') {
+    return 'Discipline Master'
+  }
+
+  if (rank === 'S') {
+    return 'Deep Work Beast'
+  }
+
+  if (rank === 'A') {
+    return 'Disciplined Builder'
+  }
+
+  if (rank === 'B') {
+    return 'Focus Builder'
+  }
+
+  return 'Discipline Beginner'
 }
 
 function sessionTimelineGroup(value) {
@@ -466,6 +488,7 @@ function AuthShell({ title, subtitle, children, onSubmit }) {
 export function DashboardPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { score: disciplineSummary } = useDisciplineScore()
   const { effectiveRules, presets } = useBlockManager()
   const { history: recentHistory } = useSessionHistory({ limit: 3, page: 1, sort: 'Newest' })
   const { missions: userMissions } = useMissions()
@@ -498,6 +521,12 @@ export function DashboardPage() {
         <StatCard label="Active Blocked" value={effectiveRules?.blockedDomains?.length || 0} meta="Effective websites" icon={Ban} />
         <StatCard label="Allowed Websites" value={effectiveRules?.allowedDomains?.length || 0} meta="Effective access" icon={ShieldCheck} />
         <StatCard label="Active Presets" value={activePresetCount} meta={`${userMissions.length} missions created`} icon={Flame} />
+        <StatCard
+          label="Discipline Score"
+          value={`${disciplineSummary?.totalXp || 0} XP`}
+          meta={`Rank ${disciplineSummary?.currentRank || 'D'} - ${disciplineSummary?.progressPercentage || 0}%`}
+          icon={Gauge}
+        />
         <StatCard label="Current Streak" value={`${streakSummary?.currentStreak || 0} days`} meta={`Best: ${streakSummary?.bestStreak || 0}`} icon={Flame} />
         <StatCard label="Completion Rate" value={`${streakSummary?.completionRate || 0}%`} meta="Tracked days" icon={Activity} />
         <StatCard label="Next Milestone" value={streakSummary?.nextMilestone || 7} meta={`${streakSummary?.milestoneProgress || 0}% complete`} icon={Trophy} />
@@ -514,6 +543,7 @@ export function DashboardPage() {
             </ActionLink>
             <ActionLink onClick={() => navigate('/mission-center')}>Mission Center</ActionLink>
             <ActionLink onClick={() => navigate('/streak-calendar')}>Streak Calendar</ActionLink>
+            <ActionLink onClick={() => navigate('/discipline-score')}>Discipline Score</ActionLink>
             {!currentSession && readyMission && <ActionLink onClick={() => navigate('/mission-center')}>Continue Editing</ActionLink>}
             <ActionLink onClick={() => navigate('/block-manager')}>Update Blocks</ActionLink>
           </div>
@@ -1723,33 +1753,88 @@ export function StreakCalendarPage() {
 }
 
 export function DisciplineScorePage() {
+  const { breakdown, error, events, isLoading, refreshScore, score, trend } = useDisciplineScore()
+  const [actionMessage, setActionMessage] = useState('')
+  const [isRecalculating, setIsRecalculating] = useState(false)
+  const trendValues = useMemo(() => {
+    if (!trend.length) {
+      return [0, 0, 0, 0, 0, 0, 0]
+    }
+
+    const maxScore = Math.max(...trend.map((item) => item.score), 1)
+    return trend.map((item) => Math.round((item.score / maxScore) * 100))
+  }, [trend])
+
+  async function handleRecalculate() {
+    try {
+      setIsRecalculating(true)
+      setActionMessage('')
+      await recalculateScore()
+      await refreshScore()
+      setActionMessage('Discipline score recalculated.')
+    } catch (recalculateError) {
+      setActionMessage(recalculateError.message)
+    } finally {
+      setIsRecalculating(false)
+    }
+  }
+
   return (
     <>
+      {error && <p className="form-message form-error">{error}</p>}
+      {actionMessage && <p className={`form-message ${actionMessage.includes('recalculated') ? 'form-success' : 'form-error'}`}>{actionMessage}</p>}
       <Card className="score-hero">
         <p className="eyebrow">Large Score Hero</p>
-        <strong>{disciplineScore.score}</strong>
-        <span>Rank: {disciplineScore.rank}</span>
-        <ProgressBar value={disciplineScore.xp} />
+        <strong>{score?.totalXp || 0}</strong>
+        <span>Rank: {score?.currentRank || 'D'}{score?.nextRank ? ` - Next: ${score.nextRank}` : ''}</span>
+        <span>{score?.xpNeeded || 0} XP needed</span>
+        <ProgressBar value={score?.progressPercentage || 0} />
+        <Button variant="secondary" onClick={handleRecalculate} disabled={isRecalculating || isLoading}>
+          <RefreshCcw size={16} />
+          {isRecalculating ? 'Recalculating...' : 'Recalculate Score'}
+        </Button>
       </Card>
       <div className="content-grid split">
         <Card title="Rank Ladder" label="Progression">
-          <div className="list-stack">{disciplineScore.ladder.map((rank) => <div className="compact-row" key={rank}><span>{rank}</span><Badge label={rank === disciplineScore.rank ? 'Current' : 'Locked'} tone={rank === disciplineScore.rank ? 'default' : 'muted'} /></div>)}</div>
+          <div className="list-stack">{disciplineRankLadder.map((rank) => <div className="compact-row" key={rank}><span>{rank} Rank</span><Badge label={rank === (score?.currentRank || 'D') ? 'Current' : 'Locked'} tone={rank === (score?.currentRank || 'D') ? 'default' : 'muted'} /></div>)}</div>
         </Card>
         <Card title="Score Breakdown" label="Inputs">
-          <div className="list-stack">{disciplineScore.breakdown.map((item) => <div key={item.label}><div className="card-row"><span>{item.label}</span><strong>{item.value}%</strong></div><ProgressBar value={item.value} /></div>)}</div>
+          <div className="list-stack">
+            {breakdown.map((item) => (
+              <div key={item.source}>
+                <div className="card-row">
+                  <span>{item.label}</span>
+                  <strong className={item.points < 0 ? 'danger-text' : ''}>{item.points > 0 ? '+' : ''}{item.points} XP</strong>
+                </div>
+                <ProgressBar value={item.percentage} />
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
       <Card title="Consumption Control" label="Score category">
         <div className="list-stack">
-          {disciplineScore.categories.map((category) => (
-            <div className="compact-row" key={category.label}>
+          {breakdown.map((category) => (
+            <div className="compact-row" key={category.source}>
               <span>{category.label}</span>
-              <strong className={category.danger ? 'danger-text' : ''}>{category.value}</strong>
+              <strong className={category.points < 0 ? 'danger-text' : ''}>{category.points > 0 ? '+' : ''}{category.points} XP</strong>
             </div>
           ))}
+          {breakdown.length === 0 && <p className="muted-text">No score events yet.</p>}
         </div>
       </Card>
-      <Card title="7-Day Score Trend" label="Momentum"><LineChartMock values={analytics.scoreTrend} /></Card>
+      <Card title="7-Day Score Trend" label="Momentum"><LineChartMock values={trendValues} /></Card>
+      <Card title="Score Events" label="History">
+        <div className="list-stack">
+          {events.slice(0, 8).map((event) => (
+            <div className="compact-row" key={event.id}>
+              <span>{event.description}</span>
+              <strong className={event.points < 0 ? 'danger-text' : ''}>{event.points > 0 ? '+' : ''}{event.points} XP</strong>
+            </div>
+          ))}
+          {events.length === 0 && <p className="muted-text">No score events yet.</p>}
+        </div>
+      </Card>
       <Card title="Achievement Badges" label="Identity shift message"><p className="identity-message">You are becoming the person who keeps promises under resistance.</p></Card>
     </>
   )
@@ -1867,6 +1952,7 @@ function ReviewPage({ title, range, data, summary }) {
 
 export function IdentityPage() {
   const { user } = useAuth()
+  const { score: identityScore } = useDisciplineScore()
   const [identityCalendarDate] = useState(() => {
     const now = new Date()
     return {
@@ -1875,19 +1961,21 @@ export function IdentityPage() {
     }
   })
   const { summary: identityStreakSummary } = useStreak(identityCalendarDate.month, identityCalendarDate.year)
+  const identityTitle = identityTitleFromRank(identityScore?.currentRank || 'D')
 
   return (
     <>
       <Card className="identity-card">
         <UserAvatar user={user} size="lg" />
         <p className="eyebrow">Identity Title</p>
-        <strong>{user?.disciplineTitle || 'DISCIPLINED BUILDER'}</strong>
+        <strong>{identityTitle}</strong>
         <p>{user?.bio || '"I do not negotiate with impulses during mission hours."'}</p>
       </Card>
       <div className="stats-grid">
         <StatCard label="Mission Completed" value="124" icon={CheckCircle2} />
         <StatCard label="Deep Work Hours" value="286h" icon={Clock} />
         <StatCard label="Current Streak" value={`${identityStreakSummary?.currentStreak || 0} days`} icon={Flame} />
+        <StatCard label="Discipline Rank" value={identityScore?.currentRank || 'D'} meta={`${identityScore?.totalXp || 0} XP`} icon={Gauge} />
         <StatCard label="Resistance Events" value="247" icon={ShieldCheck} />
         <StatCard label="Healthy Consumption Days" value={consumptionControl.identityStats.healthyDays} icon={ShieldCheck} />
         <StatCard label="Videos Avoided" value={consumptionControl.identityStats.videosAvoided} icon={Ban} />

@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma')
+const { recordMissionSessionScore } = require('./disciplineScoreService')
 
 const activeStatuses = ['ACTIVE', 'PAUSED']
 
@@ -199,6 +200,8 @@ async function pauseCurrentSession(userId) {
     include: { mission: true },
   })
 
+  await recordMissionSessionScore(updatedSession)
+
   return formatSession(updatedSession, now)
 }
 
@@ -228,6 +231,8 @@ async function resumeCurrentSession(userId) {
     },
     include: { mission: true },
   })
+
+  await recordMissionSessionScore(updatedSession)
 
   return formatSession(updatedSession, now)
 }

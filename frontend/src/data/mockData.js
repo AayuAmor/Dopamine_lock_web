@@ -32,28 +32,6 @@ export const analytics = {
   totalSessions: 124,
 }
 
-export const disciplineScore = {
-  score: 812,
-  rank: 'Operator III',
-  xp: 68,
-  breakdown: [
-    { label: 'Mission completion', value: 84 },
-    { label: 'Streak stability', value: 76 },
-    { label: 'Impulse control', value: 91 },
-    { label: 'Deep work volume', value: 69 },
-    { label: 'Consumption control', value: 82 },
-  ],
-  categories: [
-    { label: 'Mission Completion', value: '+420 XP' },
-    { label: 'Focus Hours', value: '+180 XP' },
-    { label: 'Streak', value: '+210 XP' },
-    { label: 'Distraction Resistance', value: '+90 XP' },
-    { label: 'Healthy Consumption', value: '+75 XP' },
-    { label: 'Failed Missions', value: '-18 XP', danger: true },
-  ],
-  ladder: ['Recruit', 'Builder', 'Operator I', 'Operator II', 'Operator III', 'Master'],
-}
-
 export const consumptionControl = {
   score: 82,
   status: 'Healthy Consumption',
