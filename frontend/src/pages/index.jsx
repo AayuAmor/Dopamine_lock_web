@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Activity,
   Archive,
@@ -23,7 +23,7 @@ import {
   TimerReset,
   Trash2,
   Trophy,
-} from 'lucide-react'
+} from "lucide-react";
 import {
   AchievementBadge,
   ActionLink,
@@ -45,235 +45,270 @@ import {
   SessionCard,
   StatCard,
   UserAvatar,
-} from '../components'
-import { useAuth } from '../context/useAuth'
+} from "../components";
+import { useAuth } from "../context/useAuth";
+import { achievements, futureFeatures, goals } from "../data/mockData";
+import { useAnalytics } from "../hooks/useAnalytics";
+import { useBlockManager } from "../hooks/useBlockManager";
+import { useConsumption } from "../hooks/useConsumption";
+import { useDisciplineScore } from "../hooks/useDisciplineScore";
+import { useMissions } from "../hooks/useMissions";
+import { useMissionSession } from "../hooks/useMissionSession";
+import { useSessionHistory } from "../hooks/useSessionHistory";
+import { useStreak } from "../hooks/useStreak";
 import {
-  achievements,
-  analytics,
-  futureFeatures,
-  goals,
-  monthlyReview,
-  weeklyReview,
-} from '../data/mockData'
-import { useBlockManager } from '../hooks/useBlockManager'
-import { useConsumption } from '../hooks/useConsumption'
-import { useDisciplineScore } from '../hooks/useDisciplineScore'
-import { useMissions } from '../hooks/useMissions'
-import { useMissionSession } from '../hooks/useMissionSession'
-import { useSessionHistory } from '../hooks/useSessionHistory'
-import { useStreak } from '../hooks/useStreak'
+  getConsumptionAnalytics,
+  getDashboard,
+  getFocus,
+  getMissionAnalytics,
+  getMonthly,
+  getOverview,
+  getWeekly,
+} from "../services/analyticsService";
 import {
   createRule,
   deleteRule as deleteBlockRule,
   disablePreset,
   enablePreset,
   toggleRule as toggleBlockRule,
-} from '../services/blockManagerService'
+} from "../services/blockManagerService";
 import {
   createLog as createConsumptionLog,
   updateLimits as updateConsumptionLimits,
-} from '../services/consumptionService'
-import { recalculateScore } from '../services/disciplineScoreService'
+} from "../services/consumptionService";
+import { recalculateScore } from "../services/disciplineScoreService";
 import {
   archiveMission,
   createMission,
   deleteMission,
   toggleFavorite,
   updateMission,
-} from '../services/missionService'
+} from "../services/missionService";
 import {
   abandonMission,
   completeMission,
   pauseMission,
   resumeMission,
   startMission,
-} from '../services/missionSessionService'
-import { getSession as getHistorySession } from '../services/sessionHistoryService'
+} from "../services/missionSessionService";
+import { getSession as getHistorySession } from "../services/sessionHistoryService";
 
-const missionRules = ['Strict mode', 'Block all notifications', 'Prevent tab switching']
+const missionRules = [
+  "Strict mode",
+  "Block all notifications",
+  "Prevent tab switching",
+];
 const blockCategories = [
-  'SOCIAL_MEDIA',
-  'ENTERTAINMENT',
-  'GAMING',
-  'SHOPPING',
-  'NEWS',
-  'ADULT',
-  'CUSTOM',
-  'PRODUCTIVITY',
-  'EDUCATION',
-]
+  "SOCIAL_MEDIA",
+  "ENTERTAINMENT",
+  "GAMING",
+  "SHOPPING",
+  "NEWS",
+  "ADULT",
+  "CUSTOM",
+  "PRODUCTIVITY",
+  "EDUCATION",
+];
 const blockCategoryLabels = {
-  ADULT: 'Adult',
-  CUSTOM: 'Custom',
-  EDUCATION: 'Education',
-  ENTERTAINMENT: 'Entertainment',
-  GAMING: 'Gaming',
-  NEWS: 'News',
-  PRODUCTIVITY: 'Productivity',
-  SHOPPING: 'Shopping',
-  SOCIAL_MEDIA: 'Social Media',
-}
-const missionFilters = ['All', 'Favorites', 'Archived', 'Easy', 'Medium', 'Hard']
-const missionSorts = ['Newest', 'Oldest', 'Alphabetical', 'Duration', 'Difficulty']
-const sessionFilters = ['All', 'Completed', 'Abandoned', 'Today', 'This Week', 'This Month']
-const sessionSorts = ['Newest', 'Oldest', 'Duration', 'Completion Time', 'Mission Name']
-const disciplineRankLadder = ['D', 'C', 'B', 'A', 'S', 'S+']
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const bioLimit = 500
-const avatarMaxSize = 2 * 1024 * 1024
-const avatarTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+  ADULT: "Adult",
+  CUSTOM: "Custom",
+  EDUCATION: "Education",
+  ENTERTAINMENT: "Entertainment",
+  GAMING: "Gaming",
+  NEWS: "News",
+  PRODUCTIVITY: "Productivity",
+  SHOPPING: "Shopping",
+  SOCIAL_MEDIA: "Social Media",
+};
+const missionFilters = [
+  "All",
+  "Favorites",
+  "Archived",
+  "Easy",
+  "Medium",
+  "Hard",
+];
+const missionSorts = [
+  "Newest",
+  "Oldest",
+  "Alphabetical",
+  "Duration",
+  "Difficulty",
+];
+const sessionFilters = [
+  "All",
+  "Completed",
+  "Abandoned",
+  "Today",
+  "This Week",
+  "This Month",
+];
+const sessionSorts = [
+  "Newest",
+  "Oldest",
+  "Duration",
+  "Completion Time",
+  "Mission Name",
+];
+const disciplineRankLadder = ["D", "C", "B", "A", "S", "S+"];
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const bioLimit = 500;
+const avatarMaxSize = 2 * 1024 * 1024;
+const avatarTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const defaultMissionForm = {
-  title: '',
-  goal: '',
-  description: '',
-  durationMinutes: '',
-  difficulty: 'Hard',
-  blockedWebsites: '',
-  allowedWebsites: '',
-  blockedCategories: '',
+  title: "",
+  goal: "",
+  description: "",
+  durationMinutes: "",
+  difficulty: "Hard",
+  blockedWebsites: "",
+  allowedWebsites: "",
+  blockedCategories: "",
   strictMode: true,
   blockNotifications: true,
   preventTabSwitching: true,
-  status: 'Ready',
-}
+  status: "Ready",
+};
 const defaultBlockRuleForm = {
-  category: 'CUSTOM',
-  domain: '',
-  reason: '',
-  type: 'BLOCKED',
-}
+  category: "CUSTOM",
+  domain: "",
+  reason: "",
+  type: "BLOCKED",
+};
 const defaultConsumptionLogForm = {
-  minutesConsumed: '',
-  platformSlug: '',
-  videosWatched: '',
-}
+  minutesConsumed: "",
+  platformSlug: "",
+  videosWatched: "",
+};
 
 function formatMemberSince(value) {
   if (!value) {
-    return 'Member since unknown'
+    return "Member since unknown";
   }
 
-  return `Member since ${new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(value))}`
+  return `Member since ${new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(value))}`;
 }
 
 function profileFormFromUser(user) {
   return {
-    fullName: user?.fullName || '',
-    bio: user?.bio || '',
-    timezone: user?.timezone || 'Asia/Kathmandu',
+    fullName: user?.fullName || "",
+    bio: user?.bio || "",
+    timezone: user?.timezone || "Asia/Kathmandu",
     dailyFocusGoal: user?.dailyFocusGoal || 4,
     preferredMissionDuration: user?.preferredMissionDuration || 50,
-  }
+  };
 }
 
 function formatDate(value) {
   if (!value) {
-    return 'Unknown'
+    return "Unknown";
   }
 
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(value))
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function formatClock(totalSeconds) {
-  const safeSeconds = Math.max(0, Number(totalSeconds) || 0)
-  const hours = Math.floor(safeSeconds / 3600)
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
-  const seconds = safeSeconds % 60
+  const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
 
   return [hours, minutes, seconds]
-    .map((part) => String(part).padStart(2, '0'))
-    .join(':')
+    .map((part) => String(part).padStart(2, "0"))
+    .join(":");
 }
 
 function formatDuration(totalSeconds) {
-  const safeSeconds = Math.max(0, Number(totalSeconds) || 0)
-  const hours = Math.floor(safeSeconds / 3600)
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
 
   if (hours > 0) {
-    return `${hours}h ${minutes}m`
+    return `${hours}h ${minutes}m`;
   }
 
-  return `${minutes}m`
+  return `${minutes}m`;
 }
 
 function formatTime(value) {
   if (!value) {
-    return 'Not set'
+    return "Not set";
   }
 
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value))
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function formatDateTime(value) {
   if (!value) {
-    return 'Not set'
+    return "Not set";
   }
 
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value))
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function identityTitleFromRank(rank) {
-  if (rank === 'S+') {
-    return 'Discipline Master'
+  if (rank === "S+") {
+    return "Discipline Master";
   }
 
-  if (rank === 'S') {
-    return 'Deep Work Beast'
+  if (rank === "S") {
+    return "Deep Work Beast";
   }
 
-  if (rank === 'A') {
-    return 'Disciplined Builder'
+  if (rank === "A") {
+    return "Disciplined Builder";
   }
 
-  if (rank === 'B') {
-    return 'Focus Builder'
+  if (rank === "B") {
+    return "Focus Builder";
   }
 
-  return 'Discipline Beginner'
+  return "Discipline Beginner";
 }
 
 function sessionTimelineGroup(value) {
   if (!value) {
-    return 'Earlier'
+    return "Earlier";
   }
 
-  const sessionDate = new Date(value)
-  const today = new Date()
-  const yesterday = new Date()
-  yesterday.setDate(today.getDate() - 1)
-  const weekStart = new Date()
-  weekStart.setHours(0, 0, 0, 0)
-  weekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1))
+  const sessionDate = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(
+    today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1),
+  );
 
   if (sessionDate.toDateString() === today.toDateString()) {
-    return 'Today'
+    return "Today";
   }
 
   if (sessionDate.toDateString() === yesterday.toDateString()) {
-    return 'Yesterday'
+    return "Yesterday";
   }
 
   if (sessionDate >= weekStart) {
-    return 'This Week'
+    return "This Week";
   }
 
-  return 'Earlier'
+  return "Earlier";
 }
 
 function sessionCardFromHistory(session) {
@@ -281,39 +316,39 @@ function sessionCardFromHistory(session) {
     id: session.id,
     date: sessionTimelineGroup(session.endedAt),
     duration: `${session.actualDurationMinutes || Math.round(session.elapsedSeconds / 60)} min`,
-    status: session.status === 'COMPLETED' ? 'Completed' : 'Abandoned',
+    status: session.status === "COMPLETED" ? "Completed" : "Abandoned",
     time: `${formatTime(session.startedAt)} - ${formatTime(session.endedAt)}`,
-    title: session.mission?.title || 'Untitled Mission',
+    title: session.mission?.title || "Untitled Mission",
     xp: `${session.completionPercentage}%`,
-  }
+  };
 }
 
 function parseList(value) {
-  return String(value || '')
-    .split(',')
+  return String(value || "")
+    .split(",")
     .map((item) => item.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 }
 
 function missionFormFromMission(mission) {
   if (!mission) {
-    return { ...defaultMissionForm }
+    return { ...defaultMissionForm };
   }
 
   return {
-    title: mission.title || '',
-    goal: mission.goal || '',
-    description: mission.description || '',
-    durationMinutes: mission.durationMinutes || '',
-    difficulty: mission.difficulty || 'Hard',
-    blockedWebsites: (mission.blockedWebsites || []).join(', '),
-    allowedWebsites: (mission.allowedWebsites || []).join(', '),
-    blockedCategories: (mission.blockedCategories || []).join(', '),
+    title: mission.title || "",
+    goal: mission.goal || "",
+    description: mission.description || "",
+    durationMinutes: mission.durationMinutes || "",
+    difficulty: mission.difficulty || "Hard",
+    blockedWebsites: (mission.blockedWebsites || []).join(", "),
+    allowedWebsites: (mission.allowedWebsites || []).join(", "),
+    blockedCategories: (mission.blockedCategories || []).join(", "),
     strictMode: mission.strictMode,
     blockNotifications: mission.blockNotifications,
     preventTabSwitching: mission.preventTabSwitching,
-    status: mission.status || 'Ready',
-  }
+    status: mission.status || "Ready",
+  };
 }
 
 function missionPayloadFromForm(form) {
@@ -330,31 +365,31 @@ function missionPayloadFromForm(form) {
     blockNotifications: form.blockNotifications,
     preventTabSwitching: form.preventTabSwitching,
     status: form.status,
-  }
+  };
 }
 
 function validateAuthFields(fields, requireName = false) {
   if (requireName && !fields.fullName.trim()) {
-    return 'Full name is required'
+    return "Full name is required";
   }
 
   if (!fields.email.trim() || !fields.password) {
-    return 'Email and password are required'
+    return "Email and password are required";
   }
 
   if (!emailPattern.test(fields.email.trim())) {
-    return 'Enter a valid email address'
+    return "Enter a valid email address";
   }
 
   if (fields.password.length < 6) {
-    return 'Password must be at least 6 characters'
+    return "Password must be at least 6 characters";
   }
 
   if (requireName && fields.password !== fields.confirmPassword) {
-    return 'Passwords do not match'
+    return "Passwords do not match";
   }
 
-  return ''
+  return "";
 }
 
 export function SplashPage() {
@@ -372,118 +407,176 @@ export function SplashPage() {
       <p className="eyebrow">Dopamine - The chemical of reward</p>
       <h1>Dopamine</h1>
       <p className="splash-copy">
-        Reward is useful only when it obeys direction. Lock the impulse. Finish the mission.
-        Build the identity.
+        Reward is useful only when it obeys direction. Lock the impulse. Finish
+        the mission. Build the identity.
       </p>
       <div className="splash-actions">
-        <Link className="button button-primary" to="/dashboard">Enter Dopamine Lock</Link>
-        <Link className="button button-secondary" to="/login">Login</Link>
+        <Link className="button button-primary" to="/dashboard">
+          Enter Dopamine Lock
+        </Link>
+        <Link className="button button-secondary" to="/login">
+          Login
+        </Link>
       </div>
     </main>
-  )
+  );
 }
 
 export function LoginPage() {
-  const navigate = useNavigate()
-  const { login } = useAuth()
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [error, setError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }))
-  }
+    setForm((current) => ({ ...current, [field]: value }));
+  };
 
   const handleSubmit = async (event) => {
-    event.preventDefault()
-    const validationError = validateAuthFields(form)
+    event.preventDefault();
+    const validationError = validateAuthFields(form);
 
     if (validationError) {
-      setError(validationError)
-      return
+      setError(validationError);
+      return;
     }
 
     try {
-      setError('')
-      setIsSubmitting(true)
-      await login({ email: form.email, password: form.password })
-      navigate('/dashboard', { replace: true })
+      setError("");
+      setIsSubmitting(true);
+      await login({ email: form.email, password: form.password });
+      navigate("/dashboard", { replace: true });
     } catch (authError) {
-      setError(authError.message)
+      setError(authError.message);
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
-    <AuthShell title="Login" subtitle="Return to the operating system." onSubmit={handleSubmit}>
+    <AuthShell
+      title="Login"
+      subtitle="Return to the operating system."
+      onSubmit={handleSubmit}
+    >
       {error && <p className="form-error">{error}</p>}
-      <Input label="Email" type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} placeholder="operator@dopaminelock.app" />
-      <Input label="Password" type="password" value={form.password} onChange={(event) => updateField('password', event.target.value)} placeholder="Password" />
-      <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Logging In' : 'Login'}</Button>
+      <Input
+        label="Email"
+        type="email"
+        value={form.email}
+        onChange={(event) => updateField("email", event.target.value)}
+        placeholder="operator@dopaminelock.app"
+      />
+      <Input
+        label="Password"
+        type="password"
+        value={form.password}
+        onChange={(event) => updateField("password", event.target.value)}
+        placeholder="Password"
+      />
+      <Button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? "Logging In" : "Login"}
+      </Button>
       <div className="auth-links">
         <Link to="/login">Forgot password</Link>
         <Link to="/register">Sign up</Link>
       </div>
     </AuthShell>
-  )
+  );
 }
 
 export function RegisterPage() {
-  const navigate = useNavigate()
-  const { register } = useAuth()
-  const [form, setForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '' })
-  const [error, setError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const navigate = useNavigate();
+  const { register } = useAuth();
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }))
-  }
+    setForm((current) => ({ ...current, [field]: value }));
+  };
 
   const handleSubmit = async (event) => {
-    event.preventDefault()
-    const validationError = validateAuthFields(form, true)
+    event.preventDefault();
+    const validationError = validateAuthFields(form, true);
 
     if (validationError) {
-      setError(validationError)
-      return
+      setError(validationError);
+      return;
     }
 
     try {
-      setError('')
-      setIsSubmitting(true)
+      setError("");
+      setIsSubmitting(true);
       await register({
         fullName: form.fullName,
         email: form.email,
         password: form.password,
-      })
-      navigate('/dashboard', { replace: true })
+      });
+      navigate("/dashboard", { replace: true });
     } catch (authError) {
-      setError(authError.message)
+      setError(authError.message);
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
-    <AuthShell title="Create Account" subtitle="Build a disciplined control profile." onSubmit={handleSubmit}>
+    <AuthShell
+      title="Create Account"
+      subtitle="Build a disciplined control profile."
+      onSubmit={handleSubmit}
+    >
       {error && <p className="form-error">{error}</p>}
-      <Input label="Full name" value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} placeholder="Full name" />
-      <Input label="Email" type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} placeholder="operator@dopaminelock.app" />
-      <Input label="Password" type="password" value={form.password} onChange={(event) => updateField('password', event.target.value)} placeholder="Password" />
-      <Input label="Confirm password" type="password" value={form.confirmPassword} onChange={(event) => updateField('confirmPassword', event.target.value)} placeholder="Confirm password" />
-      <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Creating Account' : 'Create Account'}</Button>
+      <Input
+        label="Full name"
+        value={form.fullName}
+        onChange={(event) => updateField("fullName", event.target.value)}
+        placeholder="Full name"
+      />
+      <Input
+        label="Email"
+        type="email"
+        value={form.email}
+        onChange={(event) => updateField("email", event.target.value)}
+        placeholder="operator@dopaminelock.app"
+      />
+      <Input
+        label="Password"
+        type="password"
+        value={form.password}
+        onChange={(event) => updateField("password", event.target.value)}
+        placeholder="Password"
+      />
+      <Input
+        label="Confirm password"
+        type="password"
+        value={form.confirmPassword}
+        onChange={(event) => updateField("confirmPassword", event.target.value)}
+        placeholder="Confirm password"
+      />
+      <Button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? "Creating Account" : "Create Account"}
+      </Button>
       <div className="auth-links">
         <Link to="/login">Login</Link>
       </div>
     </AuthShell>
-  )
+  );
 }
 
 function AuthShell({ title, subtitle, children, onSubmit }) {
   return (
     <main className="auth-screen">
-      <Link className="brand-lock auth-brand" to="/">Dopamine Lock</Link>
+      <Link className="brand-lock auth-brand" to="/">
+        Dopamine Lock
+      </Link>
       <form className="auth-card" onSubmit={onSubmit}>
         <p className="eyebrow">Access</p>
         <h1>{title}</h1>
@@ -491,273 +584,366 @@ function AuthShell({ title, subtitle, children, onSubmit }) {
         <div className="form-stack">{children}</div>
       </form>
     </main>
-  )
+  );
 }
 
 export function DashboardPage() {
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const { score: disciplineSummary } = useDisciplineScore()
-  const { summary: consumptionSummary } = useConsumption()
-  const { effectiveRules, presets } = useBlockManager()
-  const { history: recentHistory } = useSessionHistory({ limit: 3, page: 1, sort: 'Newest' })
-  const { missions: userMissions } = useMissions()
-  const { session: currentSession } = useMissionSession()
-  const [dashboardCalendarDate] = useState(() => {
-    const now = new Date()
-    return {
-      month: now.getMonth() + 1,
-      year: now.getFullYear(),
-    }
-  })
-  const { summary: streakSummary } = useStreak(dashboardCalendarDate.month, dashboardCalendarDate.year)
-  const readyMission = userMissions.find((mission) => mission.status === 'Ready' && !mission.archived)
-  const activePresetCount = presets.filter((preset) => preset.enabled).length
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { data: dashboardAnalytics } = useAnalytics(getDashboard);
+  const { effectiveRules, presets } = useBlockManager();
+  const { history: recentHistory } = useSessionHistory({
+    limit: 3,
+    page: 1,
+    sort: "Newest",
+  });
+  const { missions: userMissions } = useMissions();
+  const currentMission = dashboardAnalytics?.currentMission;
+  const readyMission = userMissions.find(
+    (mission) => mission.status === "Ready" && !mission.archived,
+  );
+  const activePresetCount = presets.filter((preset) => preset.enabled).length;
 
   return (
     <>
       <PageHeader
         eyebrow="Daily Command"
         title="Discipline Dashboard"
-        description={`Welcome back, ${user?.fullName || 'Operator'}. Track the mission, protect attention, and keep the streak intact.`}
+        description={`Welcome back, ${user?.fullName || "Operator"}. Track the mission, protect attention, and keep the streak intact.`}
       />
       <div className="stats-grid">
         <StatCard
           label="Current Mission"
-          value={currentSession ? formatClock(currentSession.remainingSeconds) : 'None'}
-          meta={currentSession?.mission?.title || 'No Active Mission'}
+          value={
+            currentMission
+              ? formatClock(currentMission.remainingSeconds)
+              : "None"
+          }
+          meta={
+            currentMission?.title ||
+            currentMission?.mission?.title ||
+            "No Active Mission"
+          }
           icon={Target}
         />
-        <StatCard label="Active Blocked" value={effectiveRules?.blockedDomains?.length || 0} meta="Effective websites" icon={Ban} />
-        <StatCard label="Allowed Websites" value={effectiveRules?.allowedDomains?.length || 0} meta="Effective access" icon={ShieldCheck} />
-        <StatCard label="Active Presets" value={activePresetCount} meta={`${userMissions.length} missions created`} icon={Flame} />
+        <StatCard
+          label="Active Blocked"
+          value={effectiveRules?.blockedDomains?.length || 0}
+          meta="Effective websites"
+          icon={Ban}
+        />
+        <StatCard
+          label="Allowed Websites"
+          value={effectiveRules?.allowedDomains?.length || 0}
+          meta="Effective access"
+          icon={ShieldCheck}
+        />
+        <StatCard
+          label="Active Presets"
+          value={activePresetCount}
+          meta={`${userMissions.length} missions created`}
+          icon={Flame}
+        />
         <StatCard
           label="Discipline Score"
-          value={`${disciplineSummary?.totalXp || 0} XP`}
-          meta={`Rank ${disciplineSummary?.currentRank || 'D'} - ${disciplineSummary?.progressPercentage || 0}%`}
+          value={`${dashboardAnalytics?.disciplineScore?.totalXp || 0} XP`}
+          meta={`Rank ${dashboardAnalytics?.currentRank || "D"} - ${dashboardAnalytics?.disciplineScore?.progressPercentage || 0}%`}
           icon={Gauge}
         />
-        <StatCard label="Current Streak" value={`${streakSummary?.currentStreak || 0} days`} meta={`Best: ${streakSummary?.bestStreak || 0}`} icon={Flame} />
-        <StatCard label="Completion Rate" value={`${streakSummary?.completionRate || 0}%`} meta="Tracked days" icon={Activity} />
-        <StatCard label="Next Milestone" value={streakSummary?.nextMilestone || 7} meta={`${streakSummary?.milestoneProgress || 0}% complete`} icon={Trophy} />
+        <StatCard
+          label="Current Streak"
+          value={`${dashboardAnalytics?.currentStreak || 0} days`}
+          meta={`Best: ${dashboardAnalytics?.bestStreak || 0}`}
+          icon={Flame}
+        />
+        <StatCard
+          label="Completion Rate"
+          value={`${dashboardAnalytics?.quickStatistics?.completionRate || 0}%`}
+          meta="Tracked days"
+          icon={Activity}
+        />
+        <StatCard
+          label="Next Milestone"
+          value={dashboardAnalytics?.quickStatistics?.nextMilestone || 7}
+          meta={`${dashboardAnalytics?.quickStatistics?.completionRate || 0}% consistency`}
+          icon={Trophy}
+        />
       </div>
       <div className="content-grid two-one">
         <Card title="Weekly Focus Chart" label="Hours locked">
-          <MiniBarChart values={analytics.focusHours} />
+          <MiniBarChart
+            values={(dashboardAnalytics?.weeklyFocusHours || []).map(
+              (item) => item.hours,
+            )}
+          />
         </Card>
         <Card title="Quick Actions" label="Next command">
           <div className="button-stack">
-            <ActionLink onClick={() => navigate('/mission-center')}>Create Mission</ActionLink>
-            <ActionLink onClick={() => navigate(currentSession ? '/active-mission' : '/mission-center')}>
-              {currentSession ? 'Continue Mission' : 'Start Mission'}
+            <ActionLink onClick={() => navigate("/mission-center")}>
+              Create Mission
             </ActionLink>
-            <ActionLink onClick={() => navigate('/mission-center')}>Mission Center</ActionLink>
-            <ActionLink onClick={() => navigate('/streak-calendar')}>Streak Calendar</ActionLink>
-            <ActionLink onClick={() => navigate('/discipline-score')}>Discipline Score</ActionLink>
-            {!currentSession && readyMission && <ActionLink onClick={() => navigate('/mission-center')}>Continue Editing</ActionLink>}
-            <ActionLink onClick={() => navigate('/block-manager')}>Update Blocks</ActionLink>
+            <ActionLink
+              onClick={() =>
+                navigate(currentMission ? "/active-mission" : "/mission-center")
+              }
+            >
+              {currentMission ? "Continue Mission" : "Start Mission"}
+            </ActionLink>
+            <ActionLink onClick={() => navigate("/mission-center")}>
+              Mission Center
+            </ActionLink>
+            <ActionLink onClick={() => navigate("/streak-calendar")}>
+              Streak Calendar
+            </ActionLink>
+            <ActionLink onClick={() => navigate("/discipline-score")}>
+              Discipline Score
+            </ActionLink>
+            {!currentMission && readyMission && (
+              <ActionLink onClick={() => navigate("/mission-center")}>
+                Continue Editing
+              </ActionLink>
+            )}
+            <ActionLink onClick={() => navigate("/block-manager")}>
+              Update Blocks
+            </ActionLink>
           </div>
         </Card>
       </div>
       <Card
         title="Consumption Overview"
         label="Create more, consume less"
-        action={<Button variant="secondary" onClick={() => navigate('/consumption-control')}>Manage Consumption</Button>}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/consumption-control")}
+          >
+            Manage Consumption
+          </Button>
+        }
       >
         <div className="review-grid compact-review">
-          <ReviewStatCard label="Today's Reels" value={consumptionSummary?.todaysReels || 0} />
-          <ReviewStatCard label="Today's Shorts" value={consumptionSummary?.todaysShorts || 0} />
-          <ReviewStatCard label="Time Consumed" value={consumptionSummary?.timeConsumed || '0m'} />
-          <ReviewStatCard label="Healthy Consumption" value={`${consumptionSummary?.dailyConsumptionScore || 100}%`} />
+          <ReviewStatCard
+            label="Today's Focus"
+            value={`${dashboardAnalytics?.todayFocus || 0}h`}
+          />
+          <ReviewStatCard
+            label="Today's Sessions"
+            value={dashboardAnalytics?.todaySessions || 0}
+          />
+          <ReviewStatCard
+            label="Weekly Focus"
+            value={`${(dashboardAnalytics?.weeklyFocusHours || []).reduce((sum, item) => sum + (item.hours || 0), 0).toFixed(1)}h`}
+          />
+          <ReviewStatCard
+            label="Healthy Consumption"
+            value={`${dashboardAnalytics?.todayConsumptionScore || 100}%`}
+          />
         </div>
       </Card>
       <Card title="Recent Sessions" label="Last activity">
         <div className="list-stack">
-          {recentHistory.items.map((session) => <SessionCard key={session.id} session={sessionCardFromHistory(session)} />)}
-          {recentHistory.items.length === 0 && <p className="muted-text">No completed or abandoned sessions yet.</p>}
-          <Button variant="secondary" onClick={() => navigate('/session-history')}>View All</Button>
+          {recentHistory.items.map((session) => (
+            <SessionCard
+              key={session.id}
+              session={sessionCardFromHistory(session)}
+            />
+          ))}
+          {recentHistory.items.length === 0 && (
+            <p className="muted-text">
+              No completed or abandoned sessions yet.
+            </p>
+          )}
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/session-history")}
+          >
+            View All
+          </Button>
         </div>
       </Card>
     </>
-  )
+  );
 }
 
 export function ProfilePage() {
-  const { refreshProfile, updateProfile, uploadAvatar, user } = useAuth()
-  const { missions: userMissions } = useMissions()
-  const { session: currentSession } = useMissionSession()
-  const { summary: sessionSummary } = useSessionHistory({ limit: 1, page: 1 })
+  const { refreshProfile, updateProfile, uploadAvatar, user } = useAuth();
+  const { missions: userMissions } = useMissions();
+  const { session: currentSession } = useMissionSession();
+  const { summary: sessionSummary } = useSessionHistory({ limit: 1, page: 1 });
   const [profileCalendarDate] = useState(() => {
-    const now = new Date()
+    const now = new Date();
     return {
       month: now.getMonth() + 1,
       year: now.getFullYear(),
-    }
-  })
-  const { summary: profileStreakSummary } = useStreak(profileCalendarDate.month, profileCalendarDate.year)
-  const fileInputRef = useRef(null)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [form, setForm] = useState(() => profileFormFromUser(null))
-  const [avatarFile, setAvatarFile] = useState(null)
-  const [avatarPreview, setAvatarPreview] = useState('')
+    };
+  });
+  const { summary: profileStreakSummary } = useStreak(
+    profileCalendarDate.month,
+    profileCalendarDate.year,
+  );
+  const fileInputRef = useRef(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [form, setForm] = useState(() => profileFormFromUser(null));
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
 
   useEffect(() => {
-    refreshProfile().catch(() => setError('Unable to load profile'))
-  }, [refreshProfile])
+    refreshProfile().catch(() => setError("Unable to load profile"));
+  }, [refreshProfile]);
 
   useEffect(() => {
     return () => {
       if (avatarPreview) {
-        URL.revokeObjectURL(avatarPreview)
+        URL.revokeObjectURL(avatarPreview);
       }
-    }
-  }, [avatarPreview])
+    };
+  }, [avatarPreview]);
 
   const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }))
-  }
+    setForm((current) => ({ ...current, [field]: value }));
+  };
 
   const beginEdit = () => {
-    setForm(profileFormFromUser(user))
-    setIsEditing(true)
-    setError('')
-    setSuccess('')
-  }
+    setForm(profileFormFromUser(user));
+    setIsEditing(true);
+    setError("");
+    setSuccess("");
+  };
 
   const validateProfile = () => {
     if (!form.fullName.trim()) {
-      return 'Name is required'
+      return "Name is required";
     }
 
     if (form.bio.length > bioLimit) {
-      return `Bio must be ${bioLimit} characters or fewer`
+      return `Bio must be ${bioLimit} characters or fewer`;
     }
 
     if (Number(form.dailyFocusGoal) <= 0) {
-      return 'Daily Goal must be a positive number'
+      return "Daily Goal must be a positive number";
     }
 
     if (Number(form.preferredMissionDuration) <= 0) {
-      return 'Preferred Mission Duration must be a positive number'
+      return "Preferred Mission Duration must be a positive number";
     }
 
-    return ''
-  }
+    return "";
+  };
 
   const handleSave = async () => {
-    const validationError = validateProfile()
+    const validationError = validateProfile();
 
     if (validationError) {
-      setError(validationError)
-      setSuccess('')
-      return
+      setError(validationError);
+      setSuccess("");
+      return;
     }
 
     try {
-      setIsSaving(true)
-      setError('')
+      setIsSaving(true);
+      setError("");
       const profile = await updateProfile({
         fullName: form.fullName,
         bio: form.bio,
         timezone: form.timezone,
         dailyFocusGoal: Number(form.dailyFocusGoal),
         preferredMissionDuration: Number(form.preferredMissionDuration),
-      })
-      setSuccess('Profile updated')
-      setIsEditing(false)
-      setForm(profileFormFromUser(profile))
+      });
+      setSuccess("Profile updated");
+      setIsEditing(false);
+      setForm(profileFormFromUser(profile));
     } catch (saveError) {
-      setError(saveError.message)
-      setSuccess('')
+      setError(saveError.message);
+      setSuccess("");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    setIsEditing(false)
-    setError('')
-    setSuccess('')
-    setForm(profileFormFromUser(user))
-  }
+    setIsEditing(false);
+    setError("");
+    setSuccess("");
+    setForm(profileFormFromUser(user));
+  };
 
   const validateAvatarFile = (file) => {
     if (!file) {
-      return 'Choose an image to upload'
+      return "Choose an image to upload";
     }
 
     if (!avatarTypes.has(file.type)) {
-      return 'Only JPG, JPEG, PNG, and WEBP images are allowed'
+      return "Only JPG, JPEG, PNG, and WEBP images are allowed";
     }
 
     if (file.size > avatarMaxSize) {
-      return 'Avatar image must be 2MB or smaller'
+      return "Avatar image must be 2MB or smaller";
     }
 
-    return ''
-  }
+    return "";
+  };
 
   const handleAvatarChange = (event) => {
-    const file = event.target.files?.[0]
-    const validationError = validateAvatarFile(file)
+    const file = event.target.files?.[0];
+    const validationError = validateAvatarFile(file);
 
     if (validationError) {
-      setAvatarFile(null)
-      setError(validationError)
-      setSuccess('')
+      setAvatarFile(null);
+      setError(validationError);
+      setSuccess("");
       if (avatarPreview) {
-        URL.revokeObjectURL(avatarPreview)
-        setAvatarPreview('')
+        URL.revokeObjectURL(avatarPreview);
+        setAvatarPreview("");
       }
-      event.target.value = ''
-      return
+      event.target.value = "";
+      return;
     }
 
-    const previewUrl = URL.createObjectURL(file)
+    const previewUrl = URL.createObjectURL(file);
     if (avatarPreview) {
-      URL.revokeObjectURL(avatarPreview)
+      URL.revokeObjectURL(avatarPreview);
     }
 
-    setAvatarFile(file)
-    setAvatarPreview(previewUrl)
-    setError('')
-    setSuccess('')
-  }
+    setAvatarFile(file);
+    setAvatarPreview(previewUrl);
+    setError("");
+    setSuccess("");
+  };
 
   const handleAvatarSave = async () => {
-    const validationError = validateAvatarFile(avatarFile)
+    const validationError = validateAvatarFile(avatarFile);
 
     if (validationError) {
-      setError(validationError)
-      setSuccess('')
-      return
+      setError(validationError);
+      setSuccess("");
+      return;
     }
 
     try {
-      setIsUploadingAvatar(true)
-      setError('')
-      await uploadAvatar(avatarFile)
-      await refreshProfile()
-      setSuccess('Profile photo updated')
-      setAvatarFile(null)
+      setIsUploadingAvatar(true);
+      setError("");
+      await uploadAvatar(avatarFile);
+      await refreshProfile();
+      setSuccess("Profile photo updated");
+      setAvatarFile(null);
       if (avatarPreview) {
-        URL.revokeObjectURL(avatarPreview)
-        setAvatarPreview('')
+        URL.revokeObjectURL(avatarPreview);
+        setAvatarPreview("");
       }
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+        fileInputRef.current.value = "";
       }
     } catch (uploadError) {
-      setError(uploadError.message)
-      setSuccess('')
+      setError(uploadError.message);
+      setSuccess("");
     } finally {
-      setIsUploadingAvatar(false)
+      setIsUploadingAvatar(false);
     }
-  }
+  };
 
   return (
     <>
@@ -765,60 +951,143 @@ export function ProfilePage() {
         <UserAvatar user={user} size="lg" />
         <div>
           <p className="eyebrow">User Profile</p>
-          <h2>{user?.fullName || 'Operator'}</h2>
-          <p>{user?.disciplineTitle || 'DISCIPLINED BUILDER'}</p>
+          <h2>{user?.fullName || "Operator"}</h2>
+          <p>{user?.disciplineTitle || "DISCIPLINED BUILDER"}</p>
           <span>{formatMemberSince(user?.createdAt)}</span>
         </div>
         <Badge label="Current Status: Active" />
       </section>
 
       {(error || success) && (
-        <p className={error ? 'form-error' : 'form-success'}>{error || success}</p>
+        <p className={error ? "form-error" : "form-success"}>
+          {error || success}
+        </p>
       )}
 
       <div className="content-grid split">
         <Card
           title="Profile Information"
           label="Authenticated data"
-          action={!isEditing && <Button variant="secondary" onClick={beginEdit}>Edit Profile</Button>}
+          action={
+            !isEditing && (
+              <Button variant="secondary" onClick={beginEdit}>
+                Edit Profile
+              </Button>
+            )
+          }
         >
           {!isEditing ? (
             <div className="profile-details">
               <ProfileDetail label="Full Name" value={user?.fullName} />
               <ProfileDetail label="Email" value={user?.email} />
-              <ProfileDetail label="Discipline Title" value={user?.disciplineTitle} />
-              <ProfileDetail label="Bio" value={user?.bio || 'No bio set'} />
-              <ProfileDetail label="Total Missions Created" value={userMissions.length} />
-              <ProfileDetail label="Total Sessions" value={sessionSummary?.totalSessions || 0} />
-              <ProfileDetail label="Completed Sessions" value={sessionSummary?.completedSessions || 0} />
-              <ProfileDetail label="Average Focus Time" value={formatDuration(sessionSummary?.averageSessionDuration || 0)} />
-              <ProfileDetail label="Current Streak" value={`${profileStreakSummary?.currentStreak || 0} days`} />
-              <ProfileDetail label="Current Active Mission" value={currentSession?.mission?.title || 'No active mission'} />
-              <ProfileDetail label="Current Session Duration" value={currentSession ? formatDuration(currentSession.elapsedSeconds) : '0m'} />
-              <ProfileDetail label="Daily Goal" value={`${user?.dailyFocusGoal || 4} hours`} />
-              <ProfileDetail label="Preferred Mission Duration" value={`${user?.preferredMissionDuration || 50} minutes`} />
+              <ProfileDetail
+                label="Discipline Title"
+                value={user?.disciplineTitle}
+              />
+              <ProfileDetail label="Bio" value={user?.bio || "No bio set"} />
+              <ProfileDetail
+                label="Total Missions Created"
+                value={userMissions.length}
+              />
+              <ProfileDetail
+                label="Total Sessions"
+                value={sessionSummary?.totalSessions || 0}
+              />
+              <ProfileDetail
+                label="Completed Sessions"
+                value={sessionSummary?.completedSessions || 0}
+              />
+              <ProfileDetail
+                label="Average Focus Time"
+                value={formatDuration(
+                  sessionSummary?.averageSessionDuration || 0,
+                )}
+              />
+              <ProfileDetail
+                label="Current Streak"
+                value={`${profileStreakSummary?.currentStreak || 0} days`}
+              />
+              <ProfileDetail
+                label="Current Active Mission"
+                value={currentSession?.mission?.title || "No active mission"}
+              />
+              <ProfileDetail
+                label="Current Session Duration"
+                value={
+                  currentSession
+                    ? formatDuration(currentSession.elapsedSeconds)
+                    : "0m"
+                }
+              />
+              <ProfileDetail
+                label="Daily Goal"
+                value={`${user?.dailyFocusGoal || 4} hours`}
+              />
+              <ProfileDetail
+                label="Preferred Mission Duration"
+                value={`${user?.preferredMissionDuration || 50} minutes`}
+              />
               <ProfileDetail label="Timezone" value={user?.timezone} />
             </div>
           ) : (
             <div className="form-stack">
-              <Input label="Name" value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} />
+              <Input
+                label="Name"
+                value={form.fullName}
+                onChange={(event) =>
+                  updateField("fullName", event.target.value)
+                }
+              />
               <label className="field">
                 <span>Bio</span>
-                <textarea value={form.bio} maxLength={bioLimit} onChange={(event) => updateField('bio', event.target.value)} />
+                <textarea
+                  value={form.bio}
+                  maxLength={bioLimit}
+                  onChange={(event) => updateField("bio", event.target.value)}
+                />
               </label>
-              <Input label="Timezone" value={form.timezone} onChange={(event) => updateField('timezone', event.target.value)} />
-              <Input label="Daily Goal" type="number" min="1" value={form.dailyFocusGoal} onChange={(event) => updateField('dailyFocusGoal', event.target.value)} />
-              <Input label="Preferred Mission Duration" type="number" min="1" value={form.preferredMissionDuration} onChange={(event) => updateField('preferredMissionDuration', event.target.value)} />
+              <Input
+                label="Timezone"
+                value={form.timezone}
+                onChange={(event) =>
+                  updateField("timezone", event.target.value)
+                }
+              />
+              <Input
+                label="Daily Goal"
+                type="number"
+                min="1"
+                value={form.dailyFocusGoal}
+                onChange={(event) =>
+                  updateField("dailyFocusGoal", event.target.value)
+                }
+              />
+              <Input
+                label="Preferred Mission Duration"
+                type="number"
+                min="1"
+                value={form.preferredMissionDuration}
+                onChange={(event) =>
+                  updateField("preferredMissionDuration", event.target.value)
+                }
+              />
               <div className="splash-actions">
-                <Button onClick={handleSave} disabled={isSaving}>{isSaving ? 'Saving' : 'Save'}</Button>
-                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? "Saving" : "Save"}
+                </Button>
+                <Button variant="secondary" onClick={handleCancel}>
+                  Cancel
+                </Button>
               </div>
             </div>
           )}
         </Card>
         <Card title="Profile Picture" label="Avatar">
           <div className="profile-avatar-card">
-            <UserAvatar user={{ ...user, avatarUrl: avatarPreview || user?.avatarUrl }} size="lg" />
+            <UserAvatar
+              user={{ ...user, avatarUrl: avatarPreview || user?.avatarUrl }}
+              size="lg"
+            />
             <input
               ref={fileInputRef}
               className="avatar-file-input"
@@ -827,11 +1096,17 @@ export function ProfilePage() {
               onChange={handleAvatarChange}
             />
             <div className="avatar-actions">
-              <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+              <Button
+                variant="secondary"
+                onClick={() => fileInputRef.current?.click()}
+              >
                 Upload Photo
               </Button>
-              <Button onClick={handleAvatarSave} disabled={!avatarFile || isUploadingAvatar}>
-                {isUploadingAvatar ? 'Saving Avatar' : 'Save Avatar'}
+              <Button
+                onClick={handleAvatarSave}
+                disabled={!avatarFile || isUploadingAvatar}
+              >
+                {isUploadingAvatar ? "Saving Avatar" : "Save Avatar"}
               </Button>
             </div>
             {avatarFile && <p className="muted-text">{avatarFile.name}</p>}
@@ -839,234 +1114,358 @@ export function ProfilePage() {
         </Card>
       </div>
     </>
-  )
+  );
 }
 
 function ProfileDetail({ label, value }) {
   return (
     <div className="compact-row">
       <span>{label}</span>
-      <strong>{value || 'Not set'}</strong>
+      <strong>{value || "Not set"}</strong>
     </div>
-  )
+  );
 }
 
 export function MissionCenterPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const {
     error: loadError,
     isLoading,
     missions: userMissions,
     refreshMissions,
-  } = useMissions()
-  const {
-    refreshSession,
-    session: currentSession,
-  } = useMissionSession()
-  const [form, setForm] = useState(() => ({ ...defaultMissionForm }))
-  const [editingMissionId, setEditingMissionId] = useState(null)
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState('All')
-  const [sort, setSort] = useState('Newest')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
+  } = useMissions();
+  const { refreshSession, session: currentSession } = useMissionSession();
+  const [form, setForm] = useState(() => ({ ...defaultMissionForm }));
+  const [editingMissionId, setEditingMissionId] = useState(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [sort, setSort] = useState("Newest");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const filteredMissions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
+    const normalizedQuery = query.trim().toLowerCase();
 
     return [...userMissions]
       .filter((mission) => {
-        if (filter === 'Favorites') {
-          return mission.favorite && !mission.archived
+        if (filter === "Favorites") {
+          return mission.favorite && !mission.archived;
         }
 
-        if (filter === 'Archived') {
-          return mission.archived
+        if (filter === "Archived") {
+          return mission.archived;
         }
 
-        if (['Easy', 'Medium', 'Hard'].includes(filter)) {
-          return mission.difficulty === filter && !mission.archived
+        if (["Easy", "Medium", "Hard"].includes(filter)) {
+          return mission.difficulty === filter && !mission.archived;
         }
 
-        return !mission.archived
+        return !mission.archived;
       })
       .filter((mission) => {
         if (!normalizedQuery) {
-          return true
+          return true;
         }
 
         return [mission.title, mission.goal, mission.description]
           .filter(Boolean)
-          .some((value) => value.toLowerCase().includes(normalizedQuery))
+          .some((value) => value.toLowerCase().includes(normalizedQuery));
       })
       .sort((a, b) => {
-        if (sort === 'Oldest') {
-          return new Date(a.createdAt) - new Date(b.createdAt)
+        if (sort === "Oldest") {
+          return new Date(a.createdAt) - new Date(b.createdAt);
         }
 
-        if (sort === 'Alphabetical') {
-          return a.title.localeCompare(b.title)
+        if (sort === "Alphabetical") {
+          return a.title.localeCompare(b.title);
         }
 
-        if (sort === 'Duration') {
-          return a.durationMinutes - b.durationMinutes
+        if (sort === "Duration") {
+          return a.durationMinutes - b.durationMinutes;
         }
 
-        if (sort === 'Difficulty') {
-          const weights = { Easy: 1, Medium: 2, Hard: 3 }
-          return weights[a.difficulty] - weights[b.difficulty]
+        if (sort === "Difficulty") {
+          const weights = { Easy: 1, Medium: 2, Hard: 3 };
+          return weights[a.difficulty] - weights[b.difficulty];
         }
 
-        return new Date(b.createdAt) - new Date(a.createdAt)
-      })
-  }, [filter, query, sort, userMissions])
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+  }, [filter, query, sort, userMissions]);
 
   const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }))
-  }
+    setForm((current) => ({ ...current, [field]: value }));
+  };
 
   const validateMissionForm = () => {
     if (!form.title.trim()) {
-      return 'Mission title is required'
+      return "Mission title is required";
     }
 
     if (!form.goal.trim()) {
-      return 'Goal is required'
+      return "Goal is required";
     }
 
-    if (!Number.isFinite(Number(form.durationMinutes)) || Number(form.durationMinutes) <= 0) {
-      return 'Duration must be a positive number'
+    if (
+      !Number.isFinite(Number(form.durationMinutes)) ||
+      Number(form.durationMinutes) <= 0
+    ) {
+      return "Duration must be a positive number";
     }
 
-    if (!['Easy', 'Medium', 'Hard'].includes(form.difficulty)) {
-      return 'Difficulty must be Easy, Medium, or Hard'
+    if (!["Easy", "Medium", "Hard"].includes(form.difficulty)) {
+      return "Difficulty must be Easy, Medium, or Hard";
     }
 
-    return ''
-  }
+    return "";
+  };
 
   const resetForm = () => {
-    setForm({ ...defaultMissionForm })
-    setEditingMissionId(null)
-    setError('')
-    setSuccess('')
-  }
+    setForm({ ...defaultMissionForm });
+    setEditingMissionId(null);
+    setError("");
+    setSuccess("");
+  };
 
   const handleSaveMission = async () => {
-    const validationError = validateMissionForm()
+    const validationError = validateMissionForm();
 
     if (validationError) {
-      setError(validationError)
-      setSuccess('')
-      return
+      setError(validationError);
+      setSuccess("");
+      return;
     }
 
     try {
-      setIsSaving(true)
-      setError('')
-      const payload = missionPayloadFromForm(form)
+      setIsSaving(true);
+      setError("");
+      const payload = missionPayloadFromForm(form);
 
       if (editingMissionId) {
-        await updateMission(editingMissionId, payload)
-        setSuccess('Mission updated')
+        await updateMission(editingMissionId, payload);
+        setSuccess("Mission updated");
       } else {
-        await createMission(payload)
-        setSuccess('Mission created')
+        await createMission(payload);
+        setSuccess("Mission created");
       }
 
-      await refreshMissions()
-      setForm({ ...defaultMissionForm })
-      setEditingMissionId(null)
+      await refreshMissions();
+      setForm({ ...defaultMissionForm });
+      setEditingMissionId(null);
     } catch (saveError) {
-      setError(saveError.message)
-      setSuccess('')
+      setError(saveError.message);
+      setSuccess("");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleEditMission = (mission) => {
-    setForm(missionFormFromMission(mission))
-    setEditingMissionId(mission.id)
-    setError('')
-    setSuccess('')
-  }
+    setForm(missionFormFromMission(mission));
+    setEditingMissionId(mission.id);
+    setError("");
+    setSuccess("");
+  };
 
   const handleMissionAction = async (action, successMessage) => {
     try {
-      setError('')
-      await action()
-      await refreshMissions()
-      setSuccess(successMessage)
+      setError("");
+      await action();
+      await refreshMissions();
+      setSuccess(successMessage);
     } catch (actionError) {
-      setError(actionError.message)
-      setSuccess('')
+      setError(actionError.message);
+      setSuccess("");
     }
-  }
+  };
 
   const handleStartMission = async (mission) => {
     try {
-      setError('')
-      await startMission(mission.id)
-      await refreshSession()
-      setSuccess('Mission started')
-      navigate('/active-mission')
+      setError("");
+      await startMission(mission.id);
+      await refreshSession();
+      setSuccess("Mission started");
+      navigate("/active-mission");
     } catch (startError) {
-      setError(startError.message)
-      setSuccess('')
+      setError(startError.message);
+      setSuccess("");
     }
-  }
+  };
 
   return (
     <>
-      <PageHeader eyebrow="Mission Center" title="Create Focus Mission" description="Define the objective, constraints, and resistance protocol." />
+      <PageHeader
+        eyebrow="Mission Center"
+        title="Create Focus Mission"
+        description="Define the objective, constraints, and resistance protocol."
+      />
       {(error || loadError || success) && (
-        <p className={error || loadError ? 'form-error' : 'form-success'}>{error || loadError || success}</p>
+        <p className={error || loadError ? "form-error" : "form-success"}>
+          {error || loadError || success}
+        </p>
       )}
       {currentSession && (
-        <p className="form-error">Finish your current mission before starting another.</p>
+        <p className="form-error">
+          Finish your current mission before starting another.
+        </p>
       )}
       <div className="content-grid split">
         <Card title="Create Mission Form" label="Mission design">
           <div className="form-grid">
-            <Input label="Mission name" value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="Deep Work: DSA Blocks" />
-            <Input label="Goal" value={form.goal} onChange={(event) => updateField('goal', event.target.value)} placeholder="Complete graph traversal drills" />
-            <Input label="Duration" type="number" min="1" value={form.durationMinutes} onChange={(event) => updateField('durationMinutes', event.target.value)} placeholder="90 minutes" />
-            <Select label="Difficulty" value={form.difficulty} onChange={(event) => updateField('difficulty', event.target.value)}>
-              {['Easy', 'Medium', 'Hard'].map((difficulty) => <option key={difficulty}>{difficulty}</option>)}
+            <Input
+              label="Mission name"
+              value={form.title}
+              onChange={(event) => updateField("title", event.target.value)}
+              placeholder="Deep Work: DSA Blocks"
+            />
+            <Input
+              label="Goal"
+              value={form.goal}
+              onChange={(event) => updateField("goal", event.target.value)}
+              placeholder="Complete graph traversal drills"
+            />
+            <Input
+              label="Duration"
+              type="number"
+              min="1"
+              value={form.durationMinutes}
+              onChange={(event) =>
+                updateField("durationMinutes", event.target.value)
+              }
+              placeholder="90 minutes"
+            />
+            <Select
+              label="Difficulty"
+              value={form.difficulty}
+              onChange={(event) =>
+                updateField("difficulty", event.target.value)
+              }
+            >
+              {["Easy", "Medium", "Hard"].map((difficulty) => (
+                <option key={difficulty}>{difficulty}</option>
+              ))}
             </Select>
             <label className="field form-span-full">
               <span>Description</span>
-              <textarea value={form.description} onChange={(event) => updateField('description', event.target.value)} placeholder="Optional mission context" />
+              <textarea
+                value={form.description}
+                onChange={(event) =>
+                  updateField("description", event.target.value)
+                }
+                placeholder="Optional mission context"
+              />
             </label>
-            <Input label="Blocked websites" value={form.blockedWebsites} onChange={(event) => updateField('blockedWebsites', event.target.value)} placeholder="youtube.com, x.com" />
-            <Input label="Allowed websites" value={form.allowedWebsites} onChange={(event) => updateField('allowedWebsites', event.target.value)} placeholder="leetcode.com, github.com" />
-            <Input label="Blocked categories" value={form.blockedCategories} onChange={(event) => updateField('blockedCategories', event.target.value)} placeholder="Social, Video, Gaming" />
-            <Select label="Status" value={form.status} onChange={(event) => updateField('status', event.target.value)}>
-              {['Draft', 'Ready'].map((status) => <option key={status}>{status}</option>)}
+            <Input
+              label="Blocked websites"
+              value={form.blockedWebsites}
+              onChange={(event) =>
+                updateField("blockedWebsites", event.target.value)
+              }
+              placeholder="youtube.com, x.com"
+            />
+            <Input
+              label="Allowed websites"
+              value={form.allowedWebsites}
+              onChange={(event) =>
+                updateField("allowedWebsites", event.target.value)
+              }
+              placeholder="leetcode.com, github.com"
+            />
+            <Input
+              label="Blocked categories"
+              value={form.blockedCategories}
+              onChange={(event) =>
+                updateField("blockedCategories", event.target.value)
+              }
+              placeholder="Social, Video, Gaming"
+            />
+            <Select
+              label="Status"
+              value={form.status}
+              onChange={(event) => updateField("status", event.target.value)}
+            >
+              {["Draft", "Ready"].map((status) => (
+                <option key={status}>{status}</option>
+              ))}
             </Select>
           </div>
           <div className="toggle-list">
-            <label><input type="checkbox" checked={form.strictMode} onChange={(event) => updateField('strictMode', event.target.checked)} /> Strict Mode</label>
-            <label><input type="checkbox" checked={form.blockNotifications} onChange={(event) => updateField('blockNotifications', event.target.checked)} /> Block Notifications</label>
-            <label><input type="checkbox" checked={form.preventTabSwitching} onChange={(event) => updateField('preventTabSwitching', event.target.checked)} /> Prevent Tab Switching</label>
+            <label>
+              <input
+                type="checkbox"
+                checked={form.strictMode}
+                onChange={(event) =>
+                  updateField("strictMode", event.target.checked)
+                }
+              />{" "}
+              Strict Mode
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={form.blockNotifications}
+                onChange={(event) =>
+                  updateField("blockNotifications", event.target.checked)
+                }
+              />{" "}
+              Block Notifications
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={form.preventTabSwitching}
+                onChange={(event) =>
+                  updateField("preventTabSwitching", event.target.checked)
+                }
+              />{" "}
+              Prevent Tab Switching
+            </label>
           </div>
           <div className="splash-actions">
             <Button onClick={handleSaveMission} disabled={isSaving}>
-              <Plus size={15} />{isSaving ? 'Saving Mission' : editingMissionId ? 'Save Mission' : 'Create Mission'}
+              <Plus size={15} />
+              {isSaving
+                ? "Saving Mission"
+                : editingMissionId
+                  ? "Save Mission"
+                  : "Create Mission"}
             </Button>
-            <Button variant="secondary" onClick={resetForm}>Cancel</Button>
+            <Button variant="secondary" onClick={resetForm}>
+              Cancel
+            </Button>
           </div>
         </Card>
-        <Card title="Mission List" label={isLoading ? 'Loading missions' : `${filteredMissions.length} shown`}>
+        <Card
+          title="Mission List"
+          label={
+            isLoading ? "Loading missions" : `${filteredMissions.length} shown`
+          }
+        >
           <div className="form-grid mission-controls">
-            <Input label="Search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search missions" />
-            <Select label="Filter" value={filter} onChange={(event) => setFilter(event.target.value)}>
-              {missionFilters.map((item) => <option key={item}>{item}</option>)}
+            <Input
+              label="Search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search missions"
+            />
+            <Select
+              label="Filter"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            >
+              {missionFilters.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
             </Select>
-            <Select label="Sort" value={sort} onChange={(event) => setSort(event.target.value)}>
-              {missionSorts.map((item) => <option key={item}>{item}</option>)}
+            <Select
+              label="Sort"
+              value={sort}
+              onChange={(event) => setSort(event.target.value)}
+            >
+              {missionSorts.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
             </Select>
           </div>
           <div className="list-stack">
@@ -1074,13 +1473,25 @@ export function MissionCenterPage() {
               <MissionListItem
                 key={mission.id}
                 mission={mission}
-                onArchive={() => handleMissionAction(
-                  () => archiveMission(mission.id, !mission.archived),
-                  mission.archived ? 'Mission restored' : 'Mission archived',
-                )}
-                onDelete={() => handleMissionAction(() => deleteMission(mission.id), 'Mission deleted')}
+                onArchive={() =>
+                  handleMissionAction(
+                    () => archiveMission(mission.id, !mission.archived),
+                    mission.archived ? "Mission restored" : "Mission archived",
+                  )
+                }
+                onDelete={() =>
+                  handleMissionAction(
+                    () => deleteMission(mission.id),
+                    "Mission deleted",
+                  )
+                }
                 onEdit={() => handleEditMission(mission)}
-                onFavorite={() => handleMissionAction(() => toggleFavorite(mission.id), 'Favorite updated')}
+                onFavorite={() =>
+                  handleMissionAction(
+                    () => toggleFavorite(mission.id),
+                    "Favorite updated",
+                  )
+                }
                 onStart={() => handleStartMission(mission)}
                 startDisabled={Boolean(currentSession) || mission.archived}
               />
@@ -1092,10 +1503,14 @@ export function MissionCenterPage() {
         </Card>
       </div>
       <Card title="Mission Rules" label="Default protection">
-        <div className="badge-row">{missionRules.map((rule) => <Badge key={rule} label={rule} />)}</div>
+        <div className="badge-row">
+          {missionRules.map((rule) => (
+            <Badge key={rule} label={rule} />
+          ))}
+        </div>
       </Card>
     </>
-  )
+  );
 }
 
 function MissionListItem({
@@ -1117,7 +1532,10 @@ function MissionListItem({
         </div>
         <div className="badge-row">
           <Badge label={mission.difficulty} />
-          <Badge label={mission.status} tone={mission.archived ? 'muted' : 'default'} />
+          <Badge
+            label={mission.status}
+            tone={mission.archived ? "muted" : "default"}
+          />
         </div>
       </div>
       <div className="mission-list-meta">
@@ -1125,92 +1543,117 @@ function MissionListItem({
         <span>Created {formatDate(mission.createdAt)}</span>
       </div>
       <div className="mission-actions">
-        <Button disabled={startDisabled} onClick={onStart}><Play size={15} />Start Mission</Button>
-        <Button variant="secondary" onClick={onEdit}><Edit3 size={15} />Edit</Button>
-        <Button variant="secondary" onClick={onFavorite}><Star size={15} />{mission.favorite ? 'Unfavorite' : 'Favorite'}</Button>
-        <Button variant="secondary" onClick={onArchive}><Archive size={15} />{mission.archived ? 'Restore' : 'Archive'}</Button>
-        <Button variant="danger" onClick={onDelete}><Trash2 size={15} />Delete</Button>
+        <Button disabled={startDisabled} onClick={onStart}>
+          <Play size={15} />
+          Start Mission
+        </Button>
+        <Button variant="secondary" onClick={onEdit}>
+          <Edit3 size={15} />
+          Edit
+        </Button>
+        <Button variant="secondary" onClick={onFavorite}>
+          <Star size={15} />
+          {mission.favorite ? "Unfavorite" : "Favorite"}
+        </Button>
+        <Button variant="secondary" onClick={onArchive}>
+          <Archive size={15} />
+          {mission.archived ? "Restore" : "Archive"}
+        </Button>
+        <Button variant="danger" onClick={onDelete}>
+          <Trash2 size={15} />
+          Delete
+        </Button>
       </div>
     </article>
-  )
+  );
 }
 
 export function ActiveMissionPage() {
-  const navigate = useNavigate()
-  const { effectiveRules } = useBlockManager()
+  const navigate = useNavigate();
+  const { effectiveRules } = useBlockManager();
   const {
     error: loadError,
     isLoading,
     refreshSession,
     session,
-  } = useMissionSession()
-  const [clockNow, setClockNow] = useState(0)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const sessionId = session?.id
-  const sessionStatus = session?.status
+  } = useMissionSession();
+  const [clockNow, setClockNow] = useState(0);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const sessionId = session?.id;
+  const sessionStatus = session?.status;
 
   const liveSession = useMemo(() => {
-    if (!session || session.status !== 'ACTIVE') {
-      return session
+    if (!session || session.status !== "ACTIVE") {
+      return session;
     }
 
-    const serverNow = session.serverNow ? new Date(session.serverNow).getTime() : 0
-    const tickDelta = clockNow && serverNow
-      ? Math.max(0, Math.floor((clockNow - serverNow) / 1000))
-      : 0
-    const elapsedSeconds = session.elapsedSeconds + tickDelta
-    const remainingSeconds = Math.max(0, session.remainingSeconds - tickDelta)
-    const totalSeconds = elapsedSeconds + remainingSeconds
-    const completionPercentage = totalSeconds > 0
-      ? Math.min(100, Math.round((elapsedSeconds / totalSeconds) * 100))
-      : session.completionPercentage
+    const serverNow = session.serverNow
+      ? new Date(session.serverNow).getTime()
+      : 0;
+    const tickDelta =
+      clockNow && serverNow
+        ? Math.max(0, Math.floor((clockNow - serverNow) / 1000))
+        : 0;
+    const elapsedSeconds = session.elapsedSeconds + tickDelta;
+    const remainingSeconds = Math.max(0, session.remainingSeconds - tickDelta);
+    const totalSeconds = elapsedSeconds + remainingSeconds;
+    const completionPercentage =
+      totalSeconds > 0
+        ? Math.min(100, Math.round((elapsedSeconds / totalSeconds) * 100))
+        : session.completionPercentage;
 
     return {
       ...session,
       completionPercentage,
       elapsedSeconds,
       remainingSeconds,
-    }
-  }, [clockNow, session])
-  const mission = liveSession?.mission
-  const effectiveBlockedDomains = effectiveRules?.blockedDomains || []
-  const effectiveAllowedDomains = effectiveRules?.allowedDomains || []
+    };
+  }, [clockNow, session]);
+  const mission = liveSession?.mission;
+  const effectiveBlockedDomains = effectiveRules?.blockedDomains || [];
+  const effectiveAllowedDomains = effectiveRules?.allowedDomains || [];
 
   useEffect(() => {
-    if (sessionStatus !== 'ACTIVE') {
-      return undefined
+    if (sessionStatus !== "ACTIVE") {
+      return undefined;
     }
 
     const intervalId = window.setInterval(() => {
-      setClockNow(Date.now())
-    }, 1000)
+      setClockNow(Date.now());
+    }, 1000);
 
-    return () => window.clearInterval(intervalId)
-  }, [sessionId, sessionStatus])
+    return () => window.clearInterval(intervalId);
+  }, [sessionId, sessionStatus]);
 
   const handleSessionAction = async (action, successMessage) => {
     try {
-      setError('')
-      await action()
-      await refreshSession()
-      setSuccess(successMessage)
+      setError("");
+      await action();
+      await refreshSession();
+      setSuccess(successMessage);
     } catch (actionError) {
-      setError(actionError.message)
-      setSuccess('')
+      setError(actionError.message);
+      setSuccess("");
     }
-  }
+  };
 
   if (isLoading) {
-    return <p className="route-loading">Loading active mission</p>
+    return <p className="route-loading">Loading active mission</p>;
   }
 
   if (!liveSession || !mission) {
     return (
       <>
-        <PageHeader eyebrow="Active Mission" title="No Active Mission" description="Start a mission from Mission Center to begin a focus session." />
+        <PageHeader
+          eyebrow="Active Mission"
+          title="No Active Mission"
+          description="Start a mission from Mission Center to begin a focus session."
+        />
         {(loadError || error || success) && (
-          <p className={loadError || error ? 'form-error' : 'form-success'}>{loadError || error || success}</p>
+          <p className={loadError || error ? "form-error" : "form-success"}>
+            {loadError || error || success}
+          </p>
         )}
         <Card className="mission-hero">
           <p className="eyebrow">Mission Timer</p>
@@ -1218,83 +1661,184 @@ export function ActiveMissionPage() {
           <span>No active mission</span>
           <ProgressBar value={0} />
         </Card>
-        <Button onClick={() => navigate('/mission-center')}><Play size={15} />Start Mission</Button>
+        <Button onClick={() => navigate("/mission-center")}>
+          <Play size={15} />
+          Start Mission
+        </Button>
       </>
-    )
+    );
   }
 
   const rules = [
-    { label: 'Strict Mode', enabled: mission.strictMode },
-    { label: 'Block Notifications', enabled: mission.blockNotifications },
-    { label: 'Prevent Tab Switching', enabled: mission.preventTabSwitching },
-  ]
+    { label: "Strict Mode", enabled: mission.strictMode },
+    { label: "Block Notifications", enabled: mission.blockNotifications },
+    { label: "Prevent Tab Switching", enabled: mission.preventTabSwitching },
+  ];
 
   return (
     <>
-      <PageHeader eyebrow="Active Mission" title={mission.title} description={mission.goal} />
+      <PageHeader
+        eyebrow="Active Mission"
+        title={mission.title}
+        description={mission.goal}
+      />
       {(loadError || error || success) && (
-        <p className={loadError || error ? 'form-error' : 'form-success'}>{loadError || error || success}</p>
+        <p className={loadError || error ? "form-error" : "form-success"}>
+          {loadError || error || success}
+        </p>
       )}
       <Card className="mission-hero">
         <p className="eyebrow">Mission Timer</p>
         <strong>{formatClock(liveSession.remainingSeconds)}</strong>
-        <span>{formatDuration(liveSession.elapsedSeconds)} elapsed - {liveSession.status}</span>
+        <span>
+          {formatDuration(liveSession.elapsedSeconds)} elapsed -{" "}
+          {liveSession.status}
+        </span>
         <ProgressBar value={liveSession.completionPercentage} />
       </Card>
       <div className="stats-grid">
-        <StatCard label="Progress" value={`${liveSession.completionPercentage}%`} meta={mission.difficulty} icon={Gauge} />
-        <StatCard label="Elapsed Time" value={formatDuration(liveSession.elapsedSeconds)} meta={`Started ${formatTime(liveSession.startedAt)}`} icon={Clock} />
-        <StatCard label="Remaining" value={formatDuration(liveSession.remainingSeconds)} meta={liveSession.estimatedFinishAt ? `Ends ${formatTime(liveSession.estimatedFinishAt)}` : 'Paused'} icon={Target} />
-        <StatCard label="Blocked Categories" value={mission.blockedCategories.length} meta={mission.blockedCategories.join(', ') || 'None'} icon={Lock} />
+        <StatCard
+          label="Progress"
+          value={`${liveSession.completionPercentage}%`}
+          meta={mission.difficulty}
+          icon={Gauge}
+        />
+        <StatCard
+          label="Elapsed Time"
+          value={formatDuration(liveSession.elapsedSeconds)}
+          meta={`Started ${formatTime(liveSession.startedAt)}`}
+          icon={Clock}
+        />
+        <StatCard
+          label="Remaining"
+          value={formatDuration(liveSession.remainingSeconds)}
+          meta={
+            liveSession.estimatedFinishAt
+              ? `Ends ${formatTime(liveSession.estimatedFinishAt)}`
+              : "Paused"
+          }
+          icon={Target}
+        />
+        <StatCard
+          label="Blocked Categories"
+          value={mission.blockedCategories.length}
+          meta={mission.blockedCategories.join(", ") || "None"}
+          icon={Lock}
+        />
       </div>
       <div className="content-grid split">
         <Card title="Mission Rules" label="Enforced">
-          <div className="list-stack">{rules.map((rule) => <div className="compact-row" key={rule.label}><span>{rule.label}</span><Badge label={rule.enabled ? 'On' : 'Off'} /></div>)}</div>
+          <div className="list-stack">
+            {rules.map((rule) => (
+              <div className="compact-row" key={rule.label}>
+                <span>{rule.label}</span>
+                <Badge label={rule.enabled ? "On" : "Off"} />
+              </div>
+            ))}
+          </div>
         </Card>
         <Card title="Blocked Websites" label="Impulse perimeter">
           <div className="badge-row">
-            {[...new Set([...effectiveBlockedDomains, ...mission.blockedWebsites])].length > 0
-              ? [...new Set([...effectiveBlockedDomains, ...mission.blockedWebsites])].map((site) => <Badge key={site} label={site} />)
-              : <p className="muted-text">No blocked websites set.</p>}
+            {[
+              ...new Set([
+                ...effectiveBlockedDomains,
+                ...mission.blockedWebsites,
+              ]),
+            ].length > 0 ? (
+              [
+                ...new Set([
+                  ...effectiveBlockedDomains,
+                  ...mission.blockedWebsites,
+                ]),
+              ].map((site) => <Badge key={site} label={site} />)
+            ) : (
+              <p className="muted-text">No blocked websites set.</p>
+            )}
           </div>
         </Card>
       </div>
       <div className="content-grid split">
         <Card title="Allowed Websites" label="Permitted">
           <div className="badge-row">
-            {[...new Set([...effectiveAllowedDomains, ...mission.allowedWebsites])].length > 0
-              ? [...new Set([...effectiveAllowedDomains, ...mission.allowedWebsites])].map((site) => <Badge key={site} label={site} />)
-              : <p className="muted-text">No allowed websites set.</p>}
+            {[
+              ...new Set([
+                ...effectiveAllowedDomains,
+                ...mission.allowedWebsites,
+              ]),
+            ].length > 0 ? (
+              [
+                ...new Set([
+                  ...effectiveAllowedDomains,
+                  ...mission.allowedWebsites,
+                ]),
+              ].map((site) => <Badge key={site} label={site} />)
+            ) : (
+              <p className="muted-text">No allowed websites set.</p>
+            )}
           </div>
         </Card>
         <Card title="Session State" label="Recovery data">
           <div className="profile-details">
             <ProfileDetail label="Current Status" value={liveSession.status} />
-            <ProfileDetail label="Started Time" value={formatTime(liveSession.startedAt)} />
-            <ProfileDetail label="Estimated Finish" value={liveSession.estimatedFinishAt ? formatTime(liveSession.estimatedFinishAt) : 'Paused'} />
+            <ProfileDetail
+              label="Started Time"
+              value={formatTime(liveSession.startedAt)}
+            />
+            <ProfileDetail
+              label="Estimated Finish"
+              value={
+                liveSession.estimatedFinishAt
+                  ? formatTime(liveSession.estimatedFinishAt)
+                  : "Paused"
+              }
+            />
           </div>
         </Card>
       </div>
       <div className="splash-actions">
-        {liveSession.status === 'ACTIVE' ? (
-          <Button variant="secondary" onClick={() => handleSessionAction(pauseMission, 'Mission paused')}><Pause size={15} />Pause</Button>
+        {liveSession.status === "ACTIVE" ? (
+          <Button
+            variant="secondary"
+            onClick={() => handleSessionAction(pauseMission, "Mission paused")}
+          >
+            <Pause size={15} />
+            Pause
+          </Button>
         ) : (
-          <Button onClick={() => handleSessionAction(resumeMission, 'Mission resumed')}><Play size={15} />Resume</Button>
+          <Button
+            onClick={() =>
+              handleSessionAction(resumeMission, "Mission resumed")
+            }
+          >
+            <Play size={15} />
+            Resume
+          </Button>
         )}
         <Button
-          disabled={liveSession.status === 'PAUSED'}
-          onClick={() => handleSessionAction(completeMission, 'Mission completed')}
+          disabled={liveSession.status === "PAUSED"}
+          onClick={() =>
+            handleSessionAction(completeMission, "Mission completed")
+          }
         >
-          <CheckCircle2 size={15} />Complete Mission
+          <CheckCircle2 size={15} />
+          Complete Mission
         </Button>
-        <Button variant="danger" onClick={() => handleSessionAction(abandonMission, 'Mission abandoned')}><Ban size={15} />Abandon Mission</Button>
+        <Button
+          variant="danger"
+          onClick={() =>
+            handleSessionAction(abandonMission, "Mission abandoned")
+          }
+        >
+          <Ban size={15} />
+          Abandon Mission
+        </Button>
       </div>
     </>
-  )
+  );
 }
 
 export function ConsumptionControlPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const {
     error: loadError,
     limits,
@@ -1303,39 +1847,49 @@ export function ConsumptionControlPage() {
     summary,
     timeline,
     weekly,
-  } = useConsumption()
+  } = useConsumption();
   const [limitForm, setLimitForm] = useState({
     maxMinutesPerDay: 120,
     maxVideosPerDay: 40,
     strictLockMode: true,
     warningThreshold: 80,
-  })
-  const [logForm, setLogForm] = useState(() => ({ ...defaultConsumptionLogForm }))
-  const [message, setMessage] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
-  const [limitTouched, setLimitTouched] = useState(false)
-  const timelineValues = timeline.length ? timeline.map((item) => item.totalVideos) : [0, 0, 0, 0, 0, 0, 0]
-  const activeLimitForm = limitTouched ? limitForm : {
-    maxMinutesPerDay: limits?.global?.maxMinutesPerDay || limitForm.maxMinutesPerDay,
-    maxVideosPerDay: limits?.global?.maxVideosPerDay || limitForm.maxVideosPerDay,
-    strictLockMode: limits?.global?.strictLockMode ?? limitForm.strictLockMode,
-    warningThreshold: limits?.global?.warningThreshold || limitForm.warningThreshold,
-  }
-  const activePlatformSlug = logForm.platformSlug || platforms[0]?.slug || ''
+  });
+  const [logForm, setLogForm] = useState(() => ({
+    ...defaultConsumptionLogForm,
+  }));
+  const [message, setMessage] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [limitTouched, setLimitTouched] = useState(false);
+  const timelineValues = timeline.length
+    ? timeline.map((item) => item.totalVideos)
+    : [0, 0, 0, 0, 0, 0, 0];
+  const activeLimitForm = limitTouched
+    ? limitForm
+    : {
+        maxMinutesPerDay:
+          limits?.global?.maxMinutesPerDay || limitForm.maxMinutesPerDay,
+        maxVideosPerDay:
+          limits?.global?.maxVideosPerDay || limitForm.maxVideosPerDay,
+        strictLockMode:
+          limits?.global?.strictLockMode ?? limitForm.strictLockMode,
+        warningThreshold:
+          limits?.global?.warningThreshold || limitForm.warningThreshold,
+      };
+  const activePlatformSlug = logForm.platformSlug || platforms[0]?.slug || "";
 
   const updateLimit = (key, value) => {
-    setLimitTouched(true)
-    setLimitForm((current) => ({ ...current, [key]: value }))
-  }
+    setLimitTouched(true);
+    setLimitForm((current) => ({ ...current, [key]: value }));
+  };
 
   const updateLogField = (key, value) => {
-    setLogForm((current) => ({ ...current, [key]: value }))
-  }
+    setLogForm((current) => ({ ...current, [key]: value }));
+  };
 
   async function handleLimitSave() {
     try {
-      setIsSaving(true)
-      setMessage('')
+      setIsSaving(true);
+      setMessage("");
       await updateConsumptionLimits({
         global: {
           maxMinutesPerDay: Number(activeLimitForm.maxMinutesPerDay),
@@ -1343,63 +1897,97 @@ export function ConsumptionControlPage() {
           strictLockMode: activeLimitForm.strictLockMode,
           warningThreshold: Number(activeLimitForm.warningThreshold),
         },
-      })
-      await refreshConsumption()
-      setLimitTouched(false)
-      setMessage('Consumption limits updated.')
+      });
+      await refreshConsumption();
+      setLimitTouched(false);
+      setMessage("Consumption limits updated.");
     } catch (error) {
-      setMessage(error.message)
+      setMessage(error.message);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 
   async function handleLogSubmit(event) {
-    event.preventDefault()
+    event.preventDefault();
 
     try {
-      setIsSaving(true)
-      setMessage('')
+      setIsSaving(true);
+      setMessage("");
       await createConsumptionLog({
         minutesConsumed: Number(logForm.minutesConsumed),
         platformSlug: activePlatformSlug,
         videosWatched: Number(logForm.videosWatched),
-      })
+      });
       setLogForm((current) => ({
         ...defaultConsumptionLogForm,
         platformSlug: current.platformSlug,
-      }))
-      await refreshConsumption()
-      setMessage('Consumption log added.')
+      }));
+      await refreshConsumption();
+      setMessage("Consumption log added.");
     } catch (error) {
-      setMessage(error.message)
+      setMessage(error.message);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 
   return (
     <>
       {loadError && <p className="form-message form-error">{loadError}</p>}
-      {message && <p className={`form-message ${message.includes('updated') || message.includes('added') ? 'form-success' : 'form-error'}`}>{message}</p>}
+      {message && (
+        <p
+          className={`form-message ${message.includes("updated") || message.includes("added") ? "form-success" : "form-error"}`}
+        >
+          {message}
+        </p>
+      )}
       <section className="consumption-hero">
         <div>
           <p className="eyebrow">Consumption Control</p>
           <h2>Consumption Control</h2>
-          <p>Track, understand, and limit short-form content before it controls your attention.</p>
+          <p>
+            Track, understand, and limit short-form content before it controls
+            your attention.
+          </p>
         </div>
         <Card className="daily-score-card">
           <p className="eyebrow">Daily Consumption Score</p>
           <strong>{summary?.dailyConsumptionScore ?? 100} / 100</strong>
-          <Badge label={summary?.statusText || 'Healthy Consumption'} tone={summary?.limitReached ? 'danger' : summary?.warningReached ? 'muted' : 'default'} />
+          <Badge
+            label={summary?.statusText || "Healthy Consumption"}
+            tone={
+              summary?.limitReached
+                ? "danger"
+                : summary?.warningReached
+                  ? "muted"
+                  : "default"
+            }
+          />
         </Card>
       </section>
 
       <div className="stats-grid">
-        <StatCard label="Today's Reels" value={summary?.todaysReels || 0} icon={Smartphone} />
-        <StatCard label="Today's Shorts" value={summary?.todaysShorts || 0} icon={TimerReset} />
-        <StatCard label="Time Consumed" value={summary?.timeConsumed || '0m'} icon={Clock} />
-        <StatCard label="Daily Limit Remaining" value={summary?.dailyLimitRemaining || '0 Videos'} icon={ShieldCheck} />
+        <StatCard
+          label="Today's Reels"
+          value={summary?.todaysReels || 0}
+          icon={Smartphone}
+        />
+        <StatCard
+          label="Today's Shorts"
+          value={summary?.todaysShorts || 0}
+          icon={TimerReset}
+        />
+        <StatCard
+          label="Time Consumed"
+          value={summary?.timeConsumed || "0m"}
+          icon={Clock}
+        />
+        <StatCard
+          label="Daily Limit Remaining"
+          value={summary?.dailyLimitRemaining || "0 Videos"}
+          icon={ShieldCheck}
+        />
       </div>
 
       <section className="panel-section">
@@ -1413,7 +2001,9 @@ export function ConsumptionControlPage() {
           {platforms.map((platform) => (
             <PlatformUsageCard key={platform.id} platform={platform} />
           ))}
-          {platforms.length === 0 && <p className="muted-text">No consumption platforms configured.</p>}
+          {platforms.length === 0 && (
+            <p className="muted-text">No consumption platforms configured.</p>
+          )}
         </div>
       </section>
 
@@ -1428,69 +2018,148 @@ export function ConsumptionControlPage() {
         </Card>
         <Card title="Daily Limit Manager" label="Backend limits">
           <div className="form-grid">
-            <Input label="Maximum videos per day" type="number" value={activeLimitForm.maxVideosPerDay} onChange={(event) => updateLimit('maxVideosPerDay', event.target.value)} />
-            <Input label="Maximum total watch time" type="number" value={activeLimitForm.maxMinutesPerDay} onChange={(event) => updateLimit('maxMinutesPerDay', event.target.value)} />
+            <Input
+              label="Maximum videos per day"
+              type="number"
+              value={activeLimitForm.maxVideosPerDay}
+              onChange={(event) =>
+                updateLimit("maxVideosPerDay", event.target.value)
+              }
+            />
+            <Input
+              label="Maximum total watch time"
+              type="number"
+              value={activeLimitForm.maxMinutesPerDay}
+              onChange={(event) =>
+                updateLimit("maxMinutesPerDay", event.target.value)
+              }
+            />
           </div>
           <label className="compact-row strict-toggle">
             <span>Strict Lock Mode</span>
-            <input type="checkbox" checked={activeLimitForm.strictLockMode} onChange={(event) => updateLimit('strictLockMode', event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={activeLimitForm.strictLockMode}
+              onChange={(event) =>
+                updateLimit("strictLockMode", event.target.checked)
+              }
+            />
           </label>
           {activeLimitForm.strictLockMode && (
-            <p className="muted-text">When your limit is reached, Dopamine Lock blocks further access until tomorrow.</p>
+            <p className="muted-text">
+              When your limit is reached, Dopamine Lock blocks further access
+              until tomorrow.
+            </p>
           )}
-          <Button onClick={handleLimitSave} disabled={isSaving}>Save Limits</Button>
+          <Button onClick={handleLimitSave} disabled={isSaving}>
+            Save Limits
+          </Button>
         </Card>
       </div>
 
       <div className="content-grid split">
         <Card title="Warning Threshold" label="Limit alerts">
-          <Select label="Choose threshold" value={activeLimitForm.warningThreshold} onChange={(event) => updateLimit('warningThreshold', event.target.value)}>
+          <Select
+            label="Choose threshold"
+            value={activeLimitForm.warningThreshold}
+            onChange={(event) =>
+              updateLimit("warningThreshold", event.target.value)
+            }
+          >
             <option value="50">50%</option>
             <option value="75">75%</option>
             <option value="90">90%</option>
             <option value="100">100%</option>
           </Select>
-          <p className="warning-preview">You have consumed {activeLimitForm.warningThreshold}% of today's reel limit.</p>
+          <p className="warning-preview">
+            You have consumed {activeLimitForm.warningThreshold}% of today's
+            reel limit.
+          </p>
         </Card>
         <Card title="Weekly Analytics" label="Consumption reduction">
           <div className="review-grid compact-review">
-            <ReviewStatCard label="Average Daily Consumption" value={weekly?.averageDailyConsumption || '0 videos'} />
-            <ReviewStatCard label="Videos Avoided" value={weekly?.videosAvoided || 0} />
-            <ReviewStatCard label="Estimated Time Saved" value={weekly?.estimatedTimeSaved || '0m'} />
-            <ReviewStatCard label="Focus Hours Gained" value={weekly?.focusHoursGained || '0.0h'} />
+            <ReviewStatCard
+              label="Average Daily Consumption"
+              value={weekly?.averageDailyConsumption || "0 videos"}
+            />
+            <ReviewStatCard
+              label="Videos Avoided"
+              value={weekly?.videosAvoided || 0}
+            />
+            <ReviewStatCard
+              label="Estimated Time Saved"
+              value={weekly?.estimatedTimeSaved || "0m"}
+            />
+            <ReviewStatCard
+              label="Focus Hours Gained"
+              value={weekly?.focusHoursGained || "0.0h"}
+            />
           </div>
         </Card>
       </div>
 
       <Card title="Add Consumption Log" label="Manual entry">
         <form className="form-grid" onSubmit={handleLogSubmit}>
-          <Select label="Platform" value={activePlatformSlug} onChange={(event) => updateLogField('platformSlug', event.target.value)}>
+          <Select
+            label="Platform"
+            value={activePlatformSlug}
+            onChange={(event) =>
+              updateLogField("platformSlug", event.target.value)
+            }
+          >
             {platforms.map((platform) => (
-              <option key={platform.slug} value={platform.slug}>{platform.platformName}</option>
+              <option key={platform.slug} value={platform.slug}>
+                {platform.platformName}
+              </option>
             ))}
           </Select>
-          <Input label="Videos Watched" type="number" min="0" value={logForm.videosWatched} onChange={(event) => updateLogField('videosWatched', event.target.value)} />
-          <Input label="Minutes Consumed" type="number" min="0" value={logForm.minutesConsumed} onChange={(event) => updateLogField('minutesConsumed', event.target.value)} />
-          <Button disabled={isSaving} type="submit">Add Log</Button>
+          <Input
+            label="Videos Watched"
+            type="number"
+            min="0"
+            value={logForm.videosWatched}
+            onChange={(event) =>
+              updateLogField("videosWatched", event.target.value)
+            }
+          />
+          <Input
+            label="Minutes Consumed"
+            type="number"
+            min="0"
+            value={logForm.minutesConsumed}
+            onChange={(event) =>
+              updateLogField("minutesConsumed", event.target.value)
+            }
+          />
+          <Button disabled={isSaving} type="submit">
+            Add Log
+          </Button>
         </form>
       </Card>
 
-      <Card title="Dopamine Awareness" label="Educational brief" className="awareness-card">
+      <Card
+        title="Dopamine Awareness"
+        label="Educational brief"
+        className="awareness-card"
+      >
         <p>
-          Short-form content trains the brain to seek constant novelty. Reducing excessive
-          consumption improves focus, memory, discipline, and deep work by lowering the demand for
-          rapid reward switching.
+          Short-form content trains the brain to seek constant novelty. Reducing
+          excessive consumption improves focus, memory, discipline, and deep
+          work by lowering the demand for rapid reward switching.
         </p>
       </Card>
 
-      <Card title="Healthy Habits Suggestions" label="Instead of watching reels">
+      <Card
+        title="Healthy Habits Suggestions"
+        label="Instead of watching reels"
+      >
         <div className="habit-grid">
           {[
-            { label: 'Read 10 pages', icon: BookOpen },
-            { label: 'Take a short walk', icon: Activity },
-            { label: 'Complete a Focus Mission', icon: Target },
-            { label: 'Review notes', icon: CheckCircle2 },
-            { label: 'Continue coding', icon: Code2 },
+            { label: "Read 10 pages", icon: BookOpen },
+            { label: "Take a short walk", icon: Activity },
+            { label: "Complete a Focus Mission", icon: Target },
+            { label: "Review notes", icon: CheckCircle2 },
+            { label: "Continue coding", icon: Code2 },
           ].map(({ label, icon: Icon }) => (
             <article className="habit-card" key={label}>
               <Icon size={20} />
@@ -1502,10 +2171,22 @@ export function ConsumptionControlPage() {
 
       <Card title="Quick Actions" label="Control commands">
         <div className="quick-action-grid">
-          <Button onClick={() => navigate('/mission-center')}>Start Focus Mission</Button>
-          <Button variant="secondary" onClick={() => navigate('/block-manager')}>Manage Website Blocking</Button>
-          <Button variant="secondary" onClick={() => navigate('/analytics')}>View Analytics</Button>
-          <Button variant="danger"><RefreshCcw size={15} />Reset Daily Limits</Button>
+          <Button onClick={() => navigate("/mission-center")}>
+            Start Focus Mission
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/block-manager")}
+          >
+            Manage Website Blocking
+          </Button>
+          <Button variant="secondary" onClick={() => navigate("/analytics")}>
+            View Analytics
+          </Button>
+          <Button variant="danger">
+            <RefreshCcw size={15} />
+            Reset Daily Limits
+          </Button>
         </div>
       </Card>
 
@@ -1517,7 +2198,7 @@ export function ConsumptionControlPage() {
         </div>
       </Card>
     </>
-  )
+  );
 }
 
 export function BlockManagerPage() {
@@ -1527,106 +2208,169 @@ export function BlockManagerPage() {
     presets,
     refreshBlockManager,
     rules,
-  } = useBlockManager()
-  const [form, setForm] = useState(() => ({ ...defaultBlockRuleForm }))
-  const [query, setQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('All')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const activePresets = presets.filter((preset) => preset.enabled)
+  } = useBlockManager();
+  const [form, setForm] = useState(() => ({ ...defaultBlockRuleForm }));
+  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const activePresets = presets.filter((preset) => preset.enabled);
   const filteredRules = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
+    const normalizedQuery = query.trim().toLowerCase();
 
     return rules.filter((rule) => {
-      const matchesSearch = !normalizedQuery
-        || rule.domain.includes(normalizedQuery)
-        || blockCategoryLabels[rule.category].toLowerCase().includes(normalizedQuery)
-        || (rule.reason || '').toLowerCase().includes(normalizedQuery)
-      const matchesCategory = categoryFilter === 'All' || rule.category === categoryFilter
+      const matchesSearch =
+        !normalizedQuery ||
+        rule.domain.includes(normalizedQuery) ||
+        blockCategoryLabels[rule.category]
+          .toLowerCase()
+          .includes(normalizedQuery) ||
+        (rule.reason || "").toLowerCase().includes(normalizedQuery);
+      const matchesCategory =
+        categoryFilter === "All" || rule.category === categoryFilter;
 
-      return matchesSearch && matchesCategory
-    })
-  }, [categoryFilter, query, rules])
-  const blocked = filteredRules.filter((rule) => rule.type === 'BLOCKED')
-  const allowed = filteredRules.filter((rule) => rule.type === 'ALLOWED')
+      return matchesSearch && matchesCategory;
+    });
+  }, [categoryFilter, query, rules]);
+  const blocked = filteredRules.filter((rule) => rule.type === "BLOCKED");
+  const allowed = filteredRules.filter((rule) => rule.type === "ALLOWED");
 
   const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }))
-  }
+    setForm((current) => ({ ...current, [field]: value }));
+  };
 
   const handleAddRule = async () => {
     try {
-      setError('')
-      await createRule(form)
-      await refreshBlockManager()
-      setForm({ ...defaultBlockRuleForm })
-      setSuccess('Block rule added')
+      setError("");
+      await createRule(form);
+      await refreshBlockManager();
+      setForm({ ...defaultBlockRuleForm });
+      setSuccess("Block rule added");
     } catch (ruleError) {
-      setError(ruleError.message)
-      setSuccess('')
+      setError(ruleError.message);
+      setSuccess("");
     }
-  }
+  };
 
   const handleRuleAction = async (action, successMessage) => {
     try {
-      setError('')
-      await action()
-      await refreshBlockManager()
-      setSuccess(successMessage)
+      setError("");
+      await action();
+      await refreshBlockManager();
+      setSuccess(successMessage);
     } catch (actionError) {
-      setError(actionError.message)
-      setSuccess('')
+      setError(actionError.message);
+      setSuccess("");
     }
-  }
+  };
 
   const handlePresetAction = async (preset) => {
     await handleRuleAction(
-      () => (preset.enabled ? disablePreset(preset.id) : enablePreset(preset.id)),
-      preset.enabled ? 'Preset disabled' : 'Preset enabled',
-    )
-  }
+      () =>
+        preset.enabled ? disablePreset(preset.id) : enablePreset(preset.id),
+      preset.enabled ? "Preset disabled" : "Preset enabled",
+    );
+  };
 
   return (
     <>
-      <PageHeader eyebrow="Block Manager" title="Control Digital Access" description="Manage the websites and categories allowed during discipline windows." />
+      <PageHeader
+        eyebrow="Block Manager"
+        title="Control Digital Access"
+        description="Manage the websites and categories allowed during discipline windows."
+      />
       {(error || loadError || success) && (
-        <p className={error || loadError ? 'form-error' : 'form-success'}>{error || loadError || success}</p>
+        <p className={error || loadError ? "form-error" : "form-success"}>
+          {error || loadError || success}
+        </p>
       )}
       <div className="toolbar">
-        <Input label="Search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search domains or categories" />
-        <Select label="Category filter" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+        <Input
+          label="Search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search domains or categories"
+        />
+        <Select
+          label="Category filter"
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+        >
           <option>All</option>
-          {blockCategories.map((category) => <option key={category} value={category}>{blockCategoryLabels[category]}</option>)}
+          {blockCategories.map((category) => (
+            <option key={category} value={category}>
+              {blockCategoryLabels[category]}
+            </option>
+          ))}
         </Select>
       </div>
       <Card title="Add Website Rule" label="Custom access">
         <div className="form-grid">
-          <Input label="Domain" value={form.domain} onChange={(event) => updateField('domain', event.target.value)} placeholder="youtube.com" />
-          <Select label="Type" value={form.type} onChange={(event) => updateField('type', event.target.value)}>
+          <Input
+            label="Domain"
+            value={form.domain}
+            onChange={(event) => updateField("domain", event.target.value)}
+            placeholder="youtube.com"
+          />
+          <Select
+            label="Type"
+            value={form.type}
+            onChange={(event) => updateField("type", event.target.value)}
+          >
             <option value="BLOCKED">Blocked</option>
             <option value="ALLOWED">Allowed</option>
           </Select>
-          <Select label="Category" value={form.category} onChange={(event) => updateField('category', event.target.value)}>
-            {blockCategories.map((category) => <option key={category} value={category}>{blockCategoryLabels[category]}</option>)}
+          <Select
+            label="Category"
+            value={form.category}
+            onChange={(event) => updateField("category", event.target.value)}
+          >
+            {blockCategories.map((category) => (
+              <option key={category} value={category}>
+                {blockCategoryLabels[category]}
+              </option>
+            ))}
           </Select>
-          <Input label="Reason" value={form.reason} onChange={(event) => updateField('reason', event.target.value)} placeholder="Optional reason" />
+          <Input
+            label="Reason"
+            value={form.reason}
+            onChange={(event) => updateField("reason", event.target.value)}
+            placeholder="Optional reason"
+          />
         </div>
-        <Button onClick={handleAddRule}><Plus size={15} />Add Custom</Button>
+        <Button onClick={handleAddRule}>
+          <Plus size={15} />
+          Add Custom
+        </Button>
       </Card>
       <div className="content-grid split">
-        <Card title="Blocked Websites List" label={isLoading ? 'Loading' : `${blocked.length} denied`}>
+        <Card
+          title="Blocked Websites List"
+          label={isLoading ? "Loading" : `${blocked.length} denied`}
+        >
           <WebsiteList
             danger
             items={blocked}
-            onDelete={(rule) => handleRuleAction(() => deleteBlockRule(rule.id), 'Rule deleted')}
-            onToggle={(rule) => handleRuleAction(() => toggleBlockRule(rule.id), 'Rule updated')}
+            onDelete={(rule) =>
+              handleRuleAction(() => deleteBlockRule(rule.id), "Rule deleted")
+            }
+            onToggle={(rule) =>
+              handleRuleAction(() => toggleBlockRule(rule.id), "Rule updated")
+            }
           />
         </Card>
-        <Card title="Allowed Websites List" label={isLoading ? 'Loading' : `${allowed.length} permitted`}>
+        <Card
+          title="Allowed Websites List"
+          label={isLoading ? "Loading" : `${allowed.length} permitted`}
+        >
           <WebsiteList
             items={allowed}
-            onDelete={(rule) => handleRuleAction(() => deleteBlockRule(rule.id), 'Rule deleted')}
-            onToggle={(rule) => handleRuleAction(() => toggleBlockRule(rule.id), 'Rule updated')}
+            onDelete={(rule) =>
+              handleRuleAction(() => deleteBlockRule(rule.id), "Rule deleted")
+            }
+            onToggle={(rule) =>
+              handleRuleAction(() => toggleBlockRule(rule.id), "Rule updated")
+            }
           />
         </Card>
       </div>
@@ -1641,8 +2385,11 @@ export function BlockManagerPage() {
               <div className="splash-actions">
                 <Badge label={blockCategoryLabels[preset.category]} />
                 <Badge label={`${preset.websites.length} sites`} />
-                <Button variant={preset.enabled ? 'danger' : 'secondary'} onClick={() => handlePresetAction(preset)}>
-                  {preset.enabled ? 'Disable' : 'Enable'}
+                <Button
+                  variant={preset.enabled ? "danger" : "secondary"}
+                  onClick={() => handlePresetAction(preset)}
+                >
+                  {preset.enabled ? "Disable" : "Enable"}
                 </Button>
               </div>
             </div>
@@ -1650,10 +2397,14 @@ export function BlockManagerPage() {
         </div>
       </Card>
       <Card title="Presets" label="Category badges">
-        <div className="badge-row">{blockCategories.map((category) => <Badge key={category} label={blockCategoryLabels[category]} />)}</div>
+        <div className="badge-row">
+          {blockCategories.map((category) => (
+            <Badge key={category} label={blockCategoryLabels[category]} />
+          ))}
+        </div>
       </Card>
     </>
-  )
+  );
 }
 
 function WebsiteList({ items, danger, onDelete, onToggle }) {
@@ -1666,26 +2417,38 @@ function WebsiteList({ items, danger, onDelete, onToggle }) {
             <span>{item.reason || blockCategoryLabels[item.category]}</span>
           </div>
           <div className="splash-actions">
-            <Badge label={blockCategoryLabels[item.category]} tone={danger ? 'danger' : 'default'} />
-            <Badge label={item.active ? 'Active' : 'Inactive'} tone={item.active ? 'default' : 'muted'} />
-            <Button variant="secondary" onClick={() => onToggle(item)}>{item.active ? 'Disable' : 'Enable'}</Button>
-            <Button variant="danger" onClick={() => onDelete(item)}>Delete</Button>
+            <Badge
+              label={blockCategoryLabels[item.category]}
+              tone={danger ? "danger" : "default"}
+            />
+            <Badge
+              label={item.active ? "Active" : "Inactive"}
+              tone={item.active ? "default" : "muted"}
+            />
+            <Button variant="secondary" onClick={() => onToggle(item)}>
+              {item.active ? "Disable" : "Enable"}
+            </Button>
+            <Button variant="danger" onClick={() => onDelete(item)}>
+              Delete
+            </Button>
           </div>
         </div>
       ))}
-      {items.length === 0 && <p className="muted-text">No websites match this view.</p>}
+      {items.length === 0 && (
+        <p className="muted-text">No websites match this view.</p>
+      )}
     </div>
-  )
+  );
 }
 
 export function SessionHistoryPage() {
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [filter, setFilter] = useState('All')
-  const [page, setPage] = useState(1)
-  const [selectedSession, setSelectedSession] = useState(null)
-  const [sort, setSort] = useState('Newest')
-  const [error, setError] = useState('')
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [page, setPage] = useState(1);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [sort, setSort] = useState("Newest");
+  const [error, setError] = useState("");
   const {
     error: loadError,
     history,
@@ -1697,53 +2460,102 @@ export function SessionHistoryPage() {
     page,
     search: debouncedQuery,
     sort,
-  })
+  });
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setDebouncedQuery(query)
-      setPage(1)
-    }, 350)
+      setDebouncedQuery(query);
+      setPage(1);
+    }, 350);
 
-    return () => window.clearTimeout(timeoutId)
-  }, [query])
+    return () => window.clearTimeout(timeoutId);
+  }, [query]);
 
   const grouped = useMemo(
     () =>
       history.items.reduce((groups, session) => {
-        const group = sessionTimelineGroup(session.endedAt)
-        groups[group] = [...(groups[group] || []), session]
-        return groups
+        const group = sessionTimelineGroup(session.endedAt);
+        groups[group] = [...(groups[group] || []), session];
+        return groups;
       }, {}),
     [history.items],
-  )
+  );
 
   const handleSelectSession = async (sessionId) => {
     try {
-      setError('')
-      setSelectedSession(await getHistorySession(sessionId))
+      setError("");
+      setSelectedSession(await getHistorySession(sessionId));
     } catch (selectError) {
-      setError(selectError.message)
+      setError(selectError.message);
     }
-  }
+  };
 
   return (
     <>
-      <PageHeader eyebrow="Session History" title="Audit Focus Sessions" description="Search the timeline and inspect completion quality." />
-      {(error || loadError) && <p className="form-error">{error || loadError}</p>}
+      <PageHeader
+        eyebrow="Session History"
+        title="Audit Focus Sessions"
+        description="Search the timeline and inspect completion quality."
+      />
+      {(error || loadError) && (
+        <p className="form-error">{error || loadError}</p>
+      )}
       <div className="stats-grid">
-        <StatCard label="Total Focus Hours" value={`${summary?.totalFocusHours || 0}h`} meta="Historical total" icon={Clock} />
-        <StatCard label="Total Sessions" value={summary?.totalSessions || 0} meta={`${summary?.currentWeekSessions || 0} this week`} icon={Target} />
-        <StatCard label="Success Rate" value={`${summary?.successRate || 0}%`} meta={`${summary?.completedSessions || 0} completed`} icon={CheckCircle2} />
-        <StatCard label="Average Duration" value={formatDuration(summary?.averageSessionDuration || 0)} meta="Per session" icon={Trophy} />
+        <StatCard
+          label="Total Focus Hours"
+          value={`${summary?.totalFocusHours || 0}h`}
+          meta="Historical total"
+          icon={Clock}
+        />
+        <StatCard
+          label="Total Sessions"
+          value={summary?.totalSessions || 0}
+          meta={`${summary?.currentWeekSessions || 0} this week`}
+          icon={Target}
+        />
+        <StatCard
+          label="Success Rate"
+          value={`${summary?.successRate || 0}%`}
+          meta={`${summary?.completedSessions || 0} completed`}
+          icon={CheckCircle2}
+        />
+        <StatCard
+          label="Average Duration"
+          value={formatDuration(summary?.averageSessionDuration || 0)}
+          meta="Per session"
+          icon={Trophy}
+        />
       </div>
       <div className="toolbar">
-        <Input label="Search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sessions" />
-        <Select label="Filters" value={filter} onChange={(event) => { setFilter(event.target.value); setPage(1) }}>
-          {sessionFilters.map((item) => <option key={item}>{item}</option>)}
+        <Input
+          label="Search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search sessions"
+        />
+        <Select
+          label="Filters"
+          value={filter}
+          onChange={(event) => {
+            setFilter(event.target.value);
+            setPage(1);
+          }}
+        >
+          {sessionFilters.map((item) => (
+            <option key={item}>{item}</option>
+          ))}
         </Select>
-        <Select label="Sort" value={sort} onChange={(event) => { setSort(event.target.value); setPage(1) }}>
-          {sessionSorts.map((item) => <option key={item}>{item}</option>)}
+        <Select
+          label="Sort"
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value);
+            setPage(1);
+          }}
+        >
+          {sessionSorts.map((item) => (
+            <option key={item}>{item}</option>
+          ))}
         </Select>
       </div>
       {Object.entries(grouped).map(([date, dateSessions]) => (
@@ -1752,150 +2564,263 @@ export function SessionHistoryPage() {
             {dateSessions.map((session) => (
               <div className="compact-row" key={session.id}>
                 <SessionCard session={sessionCardFromHistory(session)} />
-                <Button variant="secondary" onClick={() => handleSelectSession(session.id)}>Details</Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleSelectSession(session.id)}
+                >
+                  Details
+                </Button>
               </div>
             ))}
           </div>
         </Card>
       ))}
       {!isLoading && history.items.length === 0 && (
-        <Card title="No Sessions" label="History"><p className="muted-text">No completed or abandoned sessions match this view.</p></Card>
+        <Card title="No Sessions" label="History">
+          <p className="muted-text">
+            No completed or abandoned sessions match this view.
+          </p>
+        </Card>
       )}
       <div className="splash-actions">
-        <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
+        <Button
+          variant="secondary"
+          disabled={page <= 1}
+          onClick={() => setPage((current) => Math.max(1, current - 1))}
+        >
+          Previous
+        </Button>
         <Badge label={`Page ${history.page} / ${history.totalPages}`} />
-        <Button variant="secondary" disabled={page >= history.totalPages} onClick={() => setPage((current) => current + 1)}>Next</Button>
+        <Button
+          variant="secondary"
+          disabled={page >= history.totalPages}
+          onClick={() => setPage((current) => current + 1)}
+        >
+          Next
+        </Button>
       </div>
       {selectedSession && (
         <Card title="Session Details" label={selectedSession.status}>
           <div className="profile-details">
-            <ProfileDetail label="Mission Name" value={selectedSession.mission?.title} />
+            <ProfileDetail
+              label="Mission Name"
+              value={selectedSession.mission?.title}
+            />
             <ProfileDetail label="Goal" value={selectedSession.mission?.goal} />
-            <ProfileDetail label="Description" value={selectedSession.mission?.description || 'No description'} />
-            <ProfileDetail label="Duration" value={`${selectedSession.plannedDurationMinutes || selectedSession.mission?.durationMinutes || 0} minutes planned`} />
-            <ProfileDetail label="Actual Duration" value={`${selectedSession.actualDurationMinutes || Math.round(selectedSession.elapsedSeconds / 60)} minutes`} />
-            <ProfileDetail label="Completion Status" value={selectedSession.status} />
-            <ProfileDetail label="Blocked Websites" value={(selectedSession.mission?.blockedWebsites || []).join(', ') || 'None'} />
-            <ProfileDetail label="Started At" value={formatDateTime(selectedSession.startedAt)} />
-            <ProfileDetail label="Ended At" value={formatDateTime(selectedSession.endedAt)} />
-            <ProfileDetail label="Completion Reason" value={selectedSession.completionReason || 'Not set'} />
-            <ProfileDetail label="Notes" value={selectedSession.notes || 'No notes'} />
+            <ProfileDetail
+              label="Description"
+              value={selectedSession.mission?.description || "No description"}
+            />
+            <ProfileDetail
+              label="Duration"
+              value={`${selectedSession.plannedDurationMinutes || selectedSession.mission?.durationMinutes || 0} minutes planned`}
+            />
+            <ProfileDetail
+              label="Actual Duration"
+              value={`${selectedSession.actualDurationMinutes || Math.round(selectedSession.elapsedSeconds / 60)} minutes`}
+            />
+            <ProfileDetail
+              label="Completion Status"
+              value={selectedSession.status}
+            />
+            <ProfileDetail
+              label="Blocked Websites"
+              value={
+                (selectedSession.mission?.blockedWebsites || []).join(", ") ||
+                "None"
+              }
+            />
+            <ProfileDetail
+              label="Started At"
+              value={formatDateTime(selectedSession.startedAt)}
+            />
+            <ProfileDetail
+              label="Ended At"
+              value={formatDateTime(selectedSession.endedAt)}
+            />
+            <ProfileDetail
+              label="Completion Reason"
+              value={selectedSession.completionReason || "Not set"}
+            />
+            <ProfileDetail
+              label="Notes"
+              value={selectedSession.notes || "No notes"}
+            />
           </div>
         </Card>
       )}
     </>
-  )
+  );
 }
 
 export function StreakCalendarPage() {
   const [calendarDate, setCalendarDate] = useState(() => {
-    const now = new Date()
+    const now = new Date();
     return {
       month: now.getMonth() + 1,
       year: now.getFullYear(),
-    }
-  })
-  const {
-    calendar,
-    error,
-    milestones,
-    summary,
-    weekly,
-  } = useStreak(calendarDate.month, calendarDate.year)
-  const monthLabel = new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(calendarDate.year, calendarDate.month - 1, 1))
-  const nextMilestone = milestones.find((milestone) => !milestone.unlocked) || milestones[milestones.length - 1]
+    };
+  });
+  const { calendar, error, milestones, summary, weekly } = useStreak(
+    calendarDate.month,
+    calendarDate.year,
+  );
+  const monthLabel = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(calendarDate.year, calendarDate.month - 1, 1));
+  const nextMilestone =
+    milestones.find((milestone) => !milestone.unlocked) ||
+    milestones[milestones.length - 1];
 
   const moveMonth = (amount) => {
     setCalendarDate((current) => {
-      const date = new Date(current.year, current.month - 1 + amount, 1)
+      const date = new Date(current.year, current.month - 1 + amount, 1);
       return {
         month: date.getMonth() + 1,
         year: date.getFullYear(),
-      }
-    })
-  }
+      };
+    });
+  };
 
   return (
     <>
-      <PageHeader eyebrow="Streak Calendar" title="Consistency Record" description="Completed, missed, partial, and today states across the month." />
+      <PageHeader
+        eyebrow="Streak Calendar"
+        title="Consistency Record"
+        description="Completed, missed, partial, and today states across the month."
+      />
       {error && <p className="form-error">{error}</p>}
       <div className="stats-grid">
-        <StatCard label="Current Streak" value={`${summary?.currentStreak || 0} days`} meta={`Next milestone: ${summary?.nextMilestone || 7}`} icon={Flame} />
-        <StatCard label="Best Streak" value={`${summary?.bestStreak || 0} days`} meta="Personal record" icon={Trophy} />
-        <StatCard label="Completion Rate" value={`${summary?.completionRate || 0}%`} meta={`${summary?.totalCompletedDays || 0}/${summary?.totalTrackedDays || 0} tracked days`} icon={Activity} />
+        <StatCard
+          label="Current Streak"
+          value={`${summary?.currentStreak || 0} days`}
+          meta={`Next milestone: ${summary?.nextMilestone || 7}`}
+          icon={Flame}
+        />
+        <StatCard
+          label="Best Streak"
+          value={`${summary?.bestStreak || 0} days`}
+          meta="Personal record"
+          icon={Trophy}
+        />
+        <StatCard
+          label="Completion Rate"
+          value={`${summary?.completionRate || 0}%`}
+          meta={`${summary?.totalCompletedDays || 0}/${summary?.totalTrackedDays || 0} tracked days`}
+          icon={Activity}
+        />
       </div>
       <Card
         title="Monthly Calendar Grid"
         label={monthLabel}
-        action={(
+        action={
           <div className="splash-actions">
-            <Button variant="secondary" onClick={() => moveMonth(-1)}>Previous</Button>
-            <Button variant="secondary" onClick={() => moveMonth(1)}>Next</Button>
+            <Button variant="secondary" onClick={() => moveMonth(-1)}>
+              Previous
+            </Button>
+            <Button variant="secondary" onClick={() => moveMonth(1)}>
+              Next
+            </Button>
           </div>
-        )}
+        }
       >
         <CalendarGrid days={calendar.days} />
       </Card>
       <Card title="Weekly Consistency" label="Current week">
         <ProgressBar value={weekly?.percentage || 0} />
-        <p className="muted-text">{weekly?.completedDays || 0} of {weekly?.totalDays || 7} days completed this week.</p>
+        <p className="muted-text">
+          {weekly?.completedDays || 0} of {weekly?.totalDays || 7} days
+          completed this week.
+        </p>
       </Card>
-      <Card title="Next Milestone" label={nextMilestone?.title || '7-Day Streak'}>
+      <Card
+        title="Next Milestone"
+        label={nextMilestone?.title || "7-Day Streak"}
+      >
         <ProgressBar value={summary?.milestoneProgress || 0} />
-        <p className="muted-text">{summary?.currentStreak || 0} of {summary?.nextMilestone || 7} days completed.</p>
+        <p className="muted-text">
+          {summary?.currentStreak || 0} of {summary?.nextMilestone || 7} days
+          completed.
+        </p>
       </Card>
     </>
-  )
+  );
 }
 
 export function DisciplineScorePage() {
-  const { breakdown, error, events, isLoading, refreshScore, score, trend } = useDisciplineScore()
-  const [actionMessage, setActionMessage] = useState('')
-  const [isRecalculating, setIsRecalculating] = useState(false)
+  const { breakdown, error, events, isLoading, refreshScore, score, trend } =
+    useDisciplineScore();
+  const [actionMessage, setActionMessage] = useState("");
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const trendValues = useMemo(() => {
     if (!trend.length) {
-      return [0, 0, 0, 0, 0, 0, 0]
+      return [0, 0, 0, 0, 0, 0, 0];
     }
 
-    const maxScore = Math.max(...trend.map((item) => item.score), 1)
-    return trend.map((item) => Math.round((item.score / maxScore) * 100))
-  }, [trend])
+    const maxScore = Math.max(...trend.map((item) => item.score), 1);
+    return trend.map((item) => Math.round((item.score / maxScore) * 100));
+  }, [trend]);
 
   async function handleRecalculate() {
     try {
-      setIsRecalculating(true)
-      setActionMessage('')
-      await recalculateScore()
-      await refreshScore()
-      setActionMessage('Discipline score recalculated.')
+      setIsRecalculating(true);
+      setActionMessage("");
+      await recalculateScore();
+      await refreshScore();
+      setActionMessage("Discipline score recalculated.");
     } catch (recalculateError) {
-      setActionMessage(recalculateError.message)
+      setActionMessage(recalculateError.message);
     } finally {
-      setIsRecalculating(false)
+      setIsRecalculating(false);
     }
   }
 
   return (
     <>
       {error && <p className="form-message form-error">{error}</p>}
-      {actionMessage && <p className={`form-message ${actionMessage.includes('recalculated') ? 'form-success' : 'form-error'}`}>{actionMessage}</p>}
+      {actionMessage && (
+        <p
+          className={`form-message ${actionMessage.includes("recalculated") ? "form-success" : "form-error"}`}
+        >
+          {actionMessage}
+        </p>
+      )}
       <Card className="score-hero">
         <p className="eyebrow">Large Score Hero</p>
         <strong>{score?.totalXp || 0}</strong>
-        <span>Rank: {score?.currentRank || 'D'}{score?.nextRank ? ` - Next: ${score.nextRank}` : ''}</span>
+        <span>
+          Rank: {score?.currentRank || "D"}
+          {score?.nextRank ? ` - Next: ${score.nextRank}` : ""}
+        </span>
         <span>{score?.xpNeeded || 0} XP needed</span>
         <ProgressBar value={score?.progressPercentage || 0} />
-        <Button variant="secondary" onClick={handleRecalculate} disabled={isRecalculating || isLoading}>
+        <Button
+          variant="secondary"
+          onClick={handleRecalculate}
+          disabled={isRecalculating || isLoading}
+        >
           <RefreshCcw size={16} />
-          {isRecalculating ? 'Recalculating...' : 'Recalculate Score'}
+          {isRecalculating ? "Recalculating..." : "Recalculate Score"}
         </Button>
       </Card>
       <div className="content-grid split">
         <Card title="Rank Ladder" label="Progression">
-          <div className="list-stack">{disciplineRankLadder.map((rank) => <div className="compact-row" key={rank}><span>{rank} Rank</span><Badge label={rank === (score?.currentRank || 'D') ? 'Current' : 'Locked'} tone={rank === (score?.currentRank || 'D') ? 'default' : 'muted'} /></div>)}</div>
+          <div className="list-stack">
+            {disciplineRankLadder.map((rank) => (
+              <div className="compact-row" key={rank}>
+                <span>{rank} Rank</span>
+                <Badge
+                  label={
+                    rank === (score?.currentRank || "D") ? "Current" : "Locked"
+                  }
+                  tone={
+                    rank === (score?.currentRank || "D") ? "default" : "muted"
+                  }
+                />
+              </div>
+            ))}
+          </div>
         </Card>
         <Card title="Score Breakdown" label="Inputs">
           <div className="list-stack">
@@ -1903,7 +2828,10 @@ export function DisciplineScorePage() {
               <div key={item.source}>
                 <div className="card-row">
                   <span>{item.label}</span>
-                  <strong className={item.points < 0 ? 'danger-text' : ''}>{item.points > 0 ? '+' : ''}{item.points} XP</strong>
+                  <strong className={item.points < 0 ? "danger-text" : ""}>
+                    {item.points > 0 ? "+" : ""}
+                    {item.points} XP
+                  </strong>
                 </div>
                 <ProgressBar value={item.percentage} />
               </div>
@@ -1916,49 +2844,109 @@ export function DisciplineScorePage() {
           {breakdown.map((category) => (
             <div className="compact-row" key={category.source}>
               <span>{category.label}</span>
-              <strong className={category.points < 0 ? 'danger-text' : ''}>{category.points > 0 ? '+' : ''}{category.points} XP</strong>
+              <strong className={category.points < 0 ? "danger-text" : ""}>
+                {category.points > 0 ? "+" : ""}
+                {category.points} XP
+              </strong>
             </div>
           ))}
-          {breakdown.length === 0 && <p className="muted-text">No score events yet.</p>}
+          {breakdown.length === 0 && (
+            <p className="muted-text">No score events yet.</p>
+          )}
         </div>
       </Card>
-      <Card title="7-Day Score Trend" label="Momentum"><LineChartMock values={trendValues} /></Card>
+      <Card title="7-Day Score Trend" label="Momentum">
+        <LineChartMock values={trendValues} />
+      </Card>
       <Card title="Score Events" label="History">
         <div className="list-stack">
           {events.slice(0, 8).map((event) => (
             <div className="compact-row" key={event.id}>
               <span>{event.description}</span>
-              <strong className={event.points < 0 ? 'danger-text' : ''}>{event.points > 0 ? '+' : ''}{event.points} XP</strong>
+              <strong className={event.points < 0 ? "danger-text" : ""}>
+                {event.points > 0 ? "+" : ""}
+                {event.points} XP
+              </strong>
             </div>
           ))}
-          {events.length === 0 && <p className="muted-text">No score events yet.</p>}
+          {events.length === 0 && (
+            <p className="muted-text">No score events yet.</p>
+          )}
         </div>
       </Card>
-      <Card title="Achievement Badges" label="Identity shift message"><p className="identity-message">You are becoming the person who keeps promises under resistance.</p></Card>
+      <Card title="Achievement Badges" label="Identity shift message">
+        <p className="identity-message">
+          You are becoming the person who keeps promises under resistance.
+        </p>
+      </Card>
     </>
-  )
+  );
 }
 
 export function AnalyticsPage() {
-  const { platforms, summary: consumptionSummary, timeline, weekly } = useConsumption()
-  const consumptionTrend = timeline.length ? timeline.map((item) => item.score) : analytics.consumptionTrend
-  const weeklyReels = timeline.length ? timeline.map((item) => item.totalVideos) : analytics.weeklyReels
-  const weeklyShorts = timeline.length ? timeline.map((item) => item.totalMinutes) : analytics.weeklyShorts
-  const platformBreakdown = platforms.length ? platforms.map((platform) => platform.videosWatched) : analytics.platformBreakdown
+  const { data: overview } = useAnalytics(getOverview);
+  const { data: focus } = useAnalytics(getFocus);
+  const { data: missionAnalytics } = useAnalytics(getMissionAnalytics);
+  const { data: consumptionAnalytics } = useAnalytics(getConsumptionAnalytics);
+  const focusHours = focus?.trend?.map((item) => item.hours) || [];
+  const weeklyVideos =
+    consumptionAnalytics?.trend?.map((item) => item.videos) || [];
+  const weeklyMinutes =
+    consumptionAnalytics?.trend?.map((item) => item.minutes) || [];
+  const consumptionTrend =
+    consumptionAnalytics?.trend?.map((item) => item.score) || [];
+  const platformBreakdown =
+    consumptionAnalytics?.platformBreakdown?.map(
+      (platform) => platform.videos,
+    ) || [];
 
   return (
     <>
-      <PageHeader eyebrow="Analytics" title="Focus Intelligence" description="Measure hours, success rate, blocks prevented, and saved time." />
+      <PageHeader
+        eyebrow="Analytics"
+        title="Focus Intelligence"
+        description="Measure hours, success rate, blocks prevented, and saved time."
+      />
       <div className="stats-grid">
-        <StatCard label="Mission Success Rate" value={`${analytics.successRate}%`} icon={CheckCircle2} />
-        <StatCard label="Blocks Prevented" value={analytics.blocksPrevented} icon={Ban} />
-        <StatCard label="Time Saved" value={weekly?.estimatedTimeSaved || analytics.timeSaved} icon={Clock} />
-        <StatCard label="Weekly Average" value={weekly?.averageDailyConsumption || analytics.weeklyAverage} icon={Activity} />
-        <StatCard label="Best Day" value={weekly?.bestControlDay || analytics.bestDay} icon={Trophy} />
-        <StatCard label="Total Sessions" value={analytics.totalSessions} icon={Target} />
-        <StatCard label="Time Consumed" value={consumptionSummary?.timeConsumed || '0m'} icon={Smartphone} />
+        <StatCard
+          label="Mission Success Rate"
+          value={`${overview?.missionSuccessRate || 0}%`}
+          icon={CheckCircle2}
+        />
+        <StatCard
+          label="Blocks Prevented"
+          value={missionAnalytics?.completedMissions || 0}
+          icon={Ban}
+        />
+        <StatCard
+          label="Time Saved"
+          value={consumptionAnalytics?.timeSaved || "0m"}
+          icon={Clock}
+        />
+        <StatCard
+          label="Weekly Average"
+          value={`${consumptionAnalytics?.averageDailyConsumption || 0} videos`}
+          icon={Activity}
+        />
+        <StatCard
+          label="Best Day"
+          value={focus?.bestFocusDay || "None"}
+          icon={Trophy}
+        />
+        <StatCard
+          label="Total Sessions"
+          value={overview?.completedSessions || 0}
+          icon={Target}
+        />
+        <StatCard
+          label="Time Consumed"
+          value={`${consumptionAnalytics?.totalMinutes || 0}m`}
+          icon={Smartphone}
+        />
       </div>
-      <Card title="Focus Hours Chart" label="Last 7 days"><MiniBarChart values={analytics.focusHours} /></Card>
+      <Card title="Focus Hours Chart" label="Last 7 days">
+        <MiniBarChart values={focusHours} />
+      </Card>
       <section className="panel-section">
         <div className="card-head">
           <div>
@@ -1967,108 +2955,204 @@ export function AnalyticsPage() {
           </div>
         </div>
         <div className="content-grid split">
-          <Card title="Weekly Reels" label="Videos"><MiniBarChart values={weeklyReels} /></Card>
-          <Card title="Weekly Shorts" label="Minutes"><MiniBarChart values={weeklyShorts} /></Card>
-          <Card title="Time Saved" label="Avoided consumption"><LineChartMock values={consumptionTrend} /></Card>
-          <Card title="Consumption Trend" label="Last 7 days"><LineChartMock values={consumptionTrend} /></Card>
-          <Card title="Platform Breakdown" label="Share of consumption"><MiniBarChart values={platformBreakdown} /></Card>
+          <Card title="Weekly Reels" label="Videos">
+            <MiniBarChart values={weeklyVideos} />
+          </Card>
+          <Card title="Weekly Shorts" label="Minutes">
+            <MiniBarChart values={weeklyMinutes} />
+          </Card>
+          <Card title="Time Saved" label="Avoided consumption">
+            <LineChartMock values={consumptionTrend} />
+          </Card>
+          <Card title="Consumption Trend" label="Last 7 days">
+            <LineChartMock values={consumptionTrend} />
+          </Card>
+          <Card title="Platform Breakdown" label="Share of consumption">
+            <MiniBarChart values={platformBreakdown} />
+          </Card>
         </div>
       </section>
     </>
-  )
+  );
 }
 
 export function AchievementsPage() {
-  const group = (state) => achievements.filter((achievement) => achievement.state === state)
+  const group = (state) =>
+    achievements.filter((achievement) => achievement.state === state);
   return (
     <>
-      <PageHeader eyebrow="Achievements" title="Badge Vault" description="Unlocked badges, locked badges, and progress badges." />
-      {['Unlocked', 'Progress', 'Locked'].map((state) => (
+      <PageHeader
+        eyebrow="Achievements"
+        title="Badge Vault"
+        description="Unlocked badges, locked badges, and progress badges."
+      />
+      {["Unlocked", "Progress", "Locked"].map((state) => (
         <Card key={state} title={`${state} Badges`} label="Recognition">
-          <div className="achievement-grid">{group(state).map((achievement) => <AchievementBadge key={achievement.id} achievement={achievement} />)}</div>
+          <div className="achievement-grid">
+            {group(state).map((achievement) => (
+              <AchievementBadge
+                key={achievement.id}
+                achievement={achievement}
+              />
+            ))}
+          </div>
         </Card>
       ))}
     </>
-  )
+  );
 }
 
 export function GoalsHubPage() {
-  const { missions: userMissions } = useMissions()
+  const { missions: userMissions } = useMissions();
   const goalsWithMissionCounts = goals.map((goal) => {
     const keywords = goal.title
       .toLowerCase()
       .split(/\s+/)
-      .filter((word) => word.length > 3)
+      .filter((word) => word.length > 3);
     const missionCount = userMissions.filter((mission) => {
-      const searchableMission = [mission.title, mission.goal, mission.description]
+      const searchableMission = [
+        mission.title,
+        mission.goal,
+        mission.description,
+      ]
         .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
+        .join(" ")
+        .toLowerCase();
 
-      return keywords.some((keyword) => searchableMission.includes(keyword))
-    }).length
+      return keywords.some((keyword) => searchableMission.includes(keyword));
+    }).length;
 
-    return { ...goal, missions: missionCount }
-  })
+    return { ...goal, missions: missionCount };
+  });
 
   return (
     <>
-      <PageHeader eyebrow="Goals Hub" title="Long-Term Goals" description="Connect strategic goals to repeatable focus missions." action={<Button><Plus size={15} />Add New Goal</Button>} />
-      <div className="card-grid">{goalsWithMissionCounts.map((goal) => <GoalCard key={goal.id} goal={goal} />)}</div>
+      <PageHeader
+        eyebrow="Goals Hub"
+        title="Long-Term Goals"
+        description="Connect strategic goals to repeatable focus missions."
+        action={
+          <Button>
+            <Plus size={15} />
+            Add New Goal
+          </Button>
+        }
+      />
+      <div className="card-grid">
+        {goalsWithMissionCounts.map((goal) => (
+          <GoalCard key={goal.id} goal={goal} />
+        ))}
+      </div>
     </>
-  )
+  );
 }
 
 export function WeeklyReviewPage() {
-  return <ReviewPage title="Weekly Review" range={weeklyReview.range} data={weeklyReview} summary={weeklyReview.summary} />
+  const { data: weeklyReview } = useAnalytics(getWeekly, null, {});
+
+  return (
+    <ReviewPage
+      title="Weekly Review"
+      range={weeklyReview?.range || "Weekly Review"}
+      data={{
+        ...weeklyReview,
+        consistency: weeklyReview?.consistency || "0%",
+      }}
+      summary={
+        weeklyReview?.summaryMessage ||
+        "Weekly analytics will appear after your first session."
+      }
+    />
+  );
 }
 
 export function MonthlyReviewPage() {
+  const { data: monthlyReview } = useAnalytics(getMonthly, null, {});
+
   return (
     <>
-      <PageHeader eyebrow="Monthly Review" title="Monthly Discipline Report" description="Total output, success quality, and rank progress." action={<ExportButton />} />
+      <PageHeader
+        eyebrow={monthlyReview?.month || "Monthly Review"}
+        title="Monthly Discipline Report"
+        description="Total output, success quality, and rank progress."
+        action={<ExportButton />}
+      />
       <div className="review-grid">
-        <ReviewStatCard label="Total Focus Hours" value={monthlyReview.focusHours} />
-        <ReviewStatCard label="Total Sessions" value={monthlyReview.sessions} />
-        <ReviewStatCard label="Success Rate" value={monthlyReview.successRate} />
-        <ReviewStatCard label="Discipline Score Gained" value={monthlyReview.scoreGained} />
+        <ReviewStatCard
+          label="Total Focus Hours"
+          value={monthlyReview?.focusHours || "0h"}
+        />
+        <ReviewStatCard
+          label="Total Sessions"
+          value={monthlyReview?.sessions || 0}
+        />
+        <ReviewStatCard
+          label="Success Rate"
+          value={monthlyReview?.missionSuccess || "0%"}
+        />
+        <ReviewStatCard
+          label="Discipline Score Gained"
+          value={`+${monthlyReview?.xpEarned || 0}`}
+        />
       </div>
-      <Card title="Rank Progress" label="Month end"><ProgressBar value={monthlyReview.rankProgress} /></Card>
+      <Card
+        title="Rank Progress"
+        label={`Current rank ${monthlyReview?.currentRank || "D"}`}
+      >
+        <ProgressBar value={monthlyReview?.rankProgress || 0} />
+      </Card>
+      <Card title="Monthly Summary" label="Operator note">
+        <p>
+          {monthlyReview?.summaryMessage ||
+            "Monthly analytics will appear after your first session."}
+        </p>
+      </Card>
     </>
-  )
+  );
 }
 
-function ReviewPage({ title, range, data, summary }) {
+function ReviewPage({ title, range, data = {}, summary }) {
   return (
     <>
-      <PageHeader eyebrow={range} title={title} description="A blunt audit of the last operating period." />
+      <PageHeader
+        eyebrow={range}
+        title={title}
+        description="A blunt audit of the last operating period."
+      />
       <div className="review-grid">
-        <ReviewStatCard label="Focus Hours" value={data.focusHours} />
-        <ReviewStatCard label="Sessions" value={data.sessions} />
-        <ReviewStatCard label="Completed" value={data.completed} />
-        <ReviewStatCard label="Failed" value={data.failed} />
-        <ReviewStatCard label="Best Day" value={data.bestDay} />
-        <ReviewStatCard label="Worst Day" value={data.worstDay} />
-        <ReviewStatCard label="Consistency" value={data.consistency} />
+        <ReviewStatCard label="Focus Hours" value={data.focusHours || "0h"} />
+        <ReviewStatCard label="Sessions" value={data.sessions || 0} />
+        <ReviewStatCard label="Completed" value={data.completed || 0} />
+        <ReviewStatCard label="Failed" value={data.failed || 0} />
+        <ReviewStatCard label="Best Day" value={data.bestDay || "None"} />
+        <ReviewStatCard label="Worst Day" value={data.worstDay || "None"} />
+        <ReviewStatCard label="Consistency" value={data.consistency || "0%"} />
       </div>
-      <Card title="Motivational Summary" label="Operator note"><p>{summary}</p></Card>
+      <Card title="Motivational Summary" label="Operator note">
+        <p>{summary}</p>
+      </Card>
     </>
-  )
+  );
 }
 
 export function IdentityPage() {
-  const { user } = useAuth()
-  const { identity: consumptionIdentity } = useConsumption()
-  const { score: identityScore } = useDisciplineScore()
+  const { user } = useAuth();
+  const { identity: consumptionIdentity } = useConsumption();
+  const { score: identityScore } = useDisciplineScore();
   const [identityCalendarDate] = useState(() => {
-    const now = new Date()
+    const now = new Date();
     return {
       month: now.getMonth() + 1,
       year: now.getFullYear(),
-    }
-  })
-  const { summary: identityStreakSummary } = useStreak(identityCalendarDate.month, identityCalendarDate.year)
-  const identityTitle = identityTitleFromRank(identityScore?.currentRank || 'D')
+    };
+  });
+  const { summary: identityStreakSummary } = useStreak(
+    identityCalendarDate.month,
+    identityCalendarDate.year,
+  );
+  const identityTitle = identityTitleFromRank(
+    identityScore?.currentRank || "D",
+  );
 
   return (
     <>
@@ -2076,72 +3160,145 @@ export function IdentityPage() {
         <UserAvatar user={user} size="lg" />
         <p className="eyebrow">Identity Title</p>
         <strong>{identityTitle}</strong>
-        <p>{user?.bio || '"I do not negotiate with impulses during mission hours."'}</p>
+        <p>
+          {user?.bio ||
+            '"I do not negotiate with impulses during mission hours."'}
+        </p>
       </Card>
       <div className="stats-grid">
         <StatCard label="Mission Completed" value="124" icon={CheckCircle2} />
         <StatCard label="Deep Work Hours" value="286h" icon={Clock} />
-        <StatCard label="Current Streak" value={`${identityStreakSummary?.currentStreak || 0} days`} icon={Flame} />
-        <StatCard label="Discipline Rank" value={identityScore?.currentRank || 'D'} meta={`${identityScore?.totalXp || 0} XP`} icon={Gauge} />
+        <StatCard
+          label="Current Streak"
+          value={`${identityStreakSummary?.currentStreak || 0} days`}
+          icon={Flame}
+        />
+        <StatCard
+          label="Discipline Rank"
+          value={identityScore?.currentRank || "D"}
+          meta={`${identityScore?.totalXp || 0} XP`}
+          icon={Gauge}
+        />
         <StatCard label="Resistance Events" value="247" icon={ShieldCheck} />
-        <StatCard label="Healthy Consumption Days" value={consumptionIdentity?.healthyDays || 0} icon={ShieldCheck} />
-        <StatCard label="Videos Avoided" value={consumptionIdentity?.videosAvoided || 0} icon={Ban} />
-        <StatCard label="Time Saved" value={consumptionIdentity?.timeSaved || '0m'} icon={Clock} />
-        <StatCard label="Digital Discipline Rating" value={consumptionIdentity?.rating || 'D'} icon={Gauge} />
+        <StatCard
+          label="Healthy Consumption Days"
+          value={consumptionIdentity?.healthyDays || 0}
+          icon={ShieldCheck}
+        />
+        <StatCard
+          label="Videos Avoided"
+          value={consumptionIdentity?.videosAvoided || 0}
+          icon={Ban}
+        />
+        <StatCard
+          label="Time Saved"
+          value={consumptionIdentity?.timeSaved || "0m"}
+          icon={Clock}
+        />
+        <StatCard
+          label="Digital Discipline Rating"
+          value={consumptionIdentity?.rating || "D"}
+          icon={Gauge}
+        />
       </div>
     </>
-  )
+  );
 }
 
 export function BrowserExtensionPage() {
-  const { effectiveRules, presets } = useBlockManager()
-  const activePresetCount = presets.filter((preset) => preset.enabled).length
+  const { effectiveRules, presets } = useBlockManager();
+  const activePresetCount = presets.filter((preset) => preset.enabled).length;
 
   return (
     <>
-      <PageHeader eyebrow="Browser Extension" title="Extension Control" description="Monitor connection state and synced blocking results." action={<Button>Manage Extension</Button>} />
+      <PageHeader
+        eyebrow="Browser Extension"
+        title="Extension Control"
+        description="Monitor connection state and synced blocking results."
+        action={<Button>Manage Extension</Button>}
+      />
       <div className="stats-grid">
         <StatCard label="Extension Status" value="Ready" icon={ShieldCheck} />
         <StatCard label="Sync Status" value="Sync-ready" icon={Activity} />
-        <StatCard label="Effective Blocked" value={effectiveRules?.blockedDomains?.length || 0} icon={Ban} />
-        <StatCard label="Allowed Websites" value={effectiveRules?.allowedDomains?.length || 0} icon={Lock} />
-        <StatCard label="Active Presets" value={activePresetCount} icon={Target} />
+        <StatCard
+          label="Effective Blocked"
+          value={effectiveRules?.blockedDomains?.length || 0}
+          icon={Ban}
+        />
+        <StatCard
+          label="Allowed Websites"
+          value={effectiveRules?.allowedDomains?.length || 0}
+          icon={Lock}
+        />
+        <StatCard
+          label="Active Presets"
+          value={activePresetCount}
+          icon={Target}
+        />
         <StatCard label="Sync Engine" value="Pending" icon={Clock} />
       </div>
     </>
-  )
+  );
 }
 
 export function SettingsPage() {
-  const { user } = useAuth()
+  const { user } = useAuth();
 
   return (
     <>
-      <PageHeader eyebrow="Settings" title="Operating Defaults" description="General, notifications, focus rules, and account controls." />
+      <PageHeader
+        eyebrow="Settings"
+        title="Operating Defaults"
+        description="General, notifications, focus rules, and account controls."
+      />
       <Card title="Profile" label="Authenticated user">
         <div className="settings-profile">
           <UserAvatar user={user} size="md" />
           <div>
-            <h3>{user?.fullName || 'Operator'}</h3>
+            <h3>{user?.fullName || "Operator"}</h3>
             <p>{user?.email}</p>
-            <p>{user?.disciplineTitle || 'DISCIPLINED BUILDER'}</p>
+            <p>{user?.disciplineTitle || "DISCIPLINED BUILDER"}</p>
           </div>
         </div>
         <div className="review-grid compact-review">
-          <ReviewStatCard label="Daily Goal" value={`${user?.dailyFocusGoal || 4}h`} />
-          <ReviewStatCard label="Mission Duration" value={`${user?.preferredMissionDuration || 50}m`} />
-          <ReviewStatCard label="Timezone" value={user?.timezone || 'Asia/Kathmandu'} />
-          <ReviewStatCard label="Member Since" value={formatMemberSince(user?.createdAt).replace('Member since ', '')} />
+          <ReviewStatCard
+            label="Daily Goal"
+            value={`${user?.dailyFocusGoal || 4}h`}
+          />
+          <ReviewStatCard
+            label="Mission Duration"
+            value={`${user?.preferredMissionDuration || 50}m`}
+          />
+          <ReviewStatCard
+            label="Timezone"
+            value={user?.timezone || "Asia/Kathmandu"}
+          />
+          <ReviewStatCard
+            label="Member Since"
+            value={formatMemberSince(user?.createdAt).replace(
+              "Member since ",
+              "",
+            )}
+          />
         </div>
       </Card>
       <div className="content-grid split">
-        <SettingsSection title="General" rows={['Dark mode', 'Start of week']} />
-        <SettingsSection title="Notifications" rows={['Daily goal', 'Focus reminder interval']} />
-        <SettingsSection title="Focus Rules" rows={['Pause mission on idle', 'Strict mode default']} />
-        <SettingsSection title="Account" rows={['Export data']} />
+        <SettingsSection
+          title="General"
+          rows={["Dark mode", "Start of week"]}
+        />
+        <SettingsSection
+          title="Notifications"
+          rows={["Daily goal", "Focus reminder interval"]}
+        />
+        <SettingsSection
+          title="Focus Rules"
+          rows={["Pause mission on idle", "Strict mode default"]}
+        />
+        <SettingsSection title="Account" rows={["Export data"]} />
       </div>
     </>
-  )
+  );
 }
 
 function SettingsSection({ title, rows }) {
@@ -2151,25 +3308,37 @@ function SettingsSection({ title, rows }) {
         {rows.map((row) => (
           <label className="compact-row" key={row}>
             <span>{row}</span>
-            <input type="checkbox" defaultChecked={row !== 'Pause mission on idle'} />
+            <input
+              type="checkbox"
+              defaultChecked={row !== "Pause mission on idle"}
+            />
           </label>
         ))}
       </div>
     </Card>
-  )
+  );
 }
 
 export function HelpPage() {
   return (
     <>
-      <PageHeader eyebrow="Help & Support" title="Support Desk" description="FAQ, guides, contact, feedback, and quick links." />
+      <PageHeader
+        eyebrow="Help & Support"
+        title="Support Desk"
+        description="FAQ, guides, contact, feedback, and quick links."
+      />
       <div className="content-grid split">
-        {['FAQ', 'Guides', 'Contact us', 'Feedback', 'Quick links'].map((title) => (
-          <Card key={title} title={title} label="Support">
-            <p className="muted-text">Reference material for keeping the discipline system operational.</p>
-          </Card>
-        ))}
+        {["FAQ", "Guides", "Contact us", "Feedback", "Quick links"].map(
+          (title) => (
+            <Card key={title} title={title} label="Support">
+              <p className="muted-text">
+                Reference material for keeping the discipline system
+                operational.
+              </p>
+            </Card>
+          ),
+        )}
       </div>
     </>
-  )
+  );
 }
