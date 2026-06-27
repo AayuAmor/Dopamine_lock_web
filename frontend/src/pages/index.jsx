@@ -47,6 +47,7 @@ import {
 import { useAuth } from "../context/useAuth";
 import { futureFeatures } from "../data/mockData";
 import { useAnalytics } from "../hooks/useAnalytics";
+import { useDashboard } from "../hooks/useDashboard";
 import { useBlockManager } from "../hooks/useBlockManager";
 import { useConsumption } from "../hooks/useConsumption";
 import { useDisciplineScore } from "../hooks/useDisciplineScore";
@@ -61,7 +62,6 @@ import { useStreak } from "../hooks/useStreak";
 import { useWeeklyReview } from "../hooks/useWeeklyReview";
 import {
   getConsumptionAnalytics,
-  getDashboard,
   getFocus,
   getMissionAnalytics,
   getOverview,
@@ -605,94 +605,92 @@ function AuthShell({ title, subtitle, children, onSubmit }) {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { data: dashboardAnalytics } = useAnalytics(getDashboard);
-  const { summary: achievementSummary } = useAchievements();
-  const { summary: identitySummary } = useIdentity();
-  const { review: dashboardWeeklyReview } = useWeeklyReview();
-  const { review: dashboardMonthlyReview } = useMonthlyReview();
-  const { effectiveRules } = useBlockManager();
-  const { history: recentHistory } = useSessionHistory({
-    limit: 3,
-    page: 1,
-    sort: "Newest",
-  });
-  const { missions: userMissions } = useMissions();
-  const currentMission = dashboardAnalytics?.currentMission;
-  const readyMission = userMissions.find(
-    (mission) => mission.status === "Ready" && !mission.archived,
-  );
+  const { dashboard, error, isLoading } = useDashboard();
+  const userSummary = dashboard?.userSummary || {};
+  const currentMission = dashboard?.currentMission;
+  const missionStats = dashboard?.missionStats || {};
+  const discipline = dashboard?.disciplineSummary || {};
+  const streak = dashboard?.streakSummary || {};
+  const consumption = dashboard?.consumptionSummary || {};
+  const goals = dashboard?.goalsSummary || {};
+  const achievements = dashboard?.achievementsSummary || {};
+  const weekly = dashboard?.weeklyReviewSummary || {};
+  const monthly = dashboard?.monthlyReviewSummary || {};
+  const analytics = dashboard?.analyticsSnapshot || {};
+  const quickActions = dashboard?.quickActions || {};
+  const recentSessions = dashboard?.recentSessions || [];
+  const hasActiveMission = Boolean(currentMission?.activeSession);
 
   return (
     <>
       <PageHeader
         eyebrow="Daily Command"
         title="Discipline Dashboard"
-        description={`Welcome back, ${user?.fullName || "Operator"}. Track the mission, protect attention, and keep the streak intact.`}
+        description={`Welcome back, ${userSummary.fullName || "Operator"}. Track the mission, protect attention, and keep the streak intact.`}
       />
+      {isLoading && (
+        <p className="muted-text">Loading dashboard command center...</p>
+      )}
+      {error && <p className="form-message form-error">{error}</p>}
       <div className="stats-grid">
         <StatCard
           label="Current Mission"
           value={
-            currentMission
+            hasActiveMission
               ? formatClock(currentMission.remainingSeconds)
               : "None"
           }
-          meta={
-            currentMission?.title ||
-            currentMission?.mission?.title ||
-            "No Active Mission"
-          }
+          meta={currentMission?.missionTitle || "No Active Mission"}
           icon={Target}
         />
         <StatCard
-          label="Active Blocked"
-          value={effectiveRules?.blockedDomains?.length || 0}
-          meta="Effective websites"
-          icon={Ban}
+          label="Today's Focus"
+          value={`${analytics.todayFocusMinutes || 0}m`}
+          meta="Focused minutes"
+          icon={Clock}
         />
         <StatCard
-          label="Allowed Websites"
-          value={effectiveRules?.allowedDomains?.length || 0}
-          meta="Effective access"
-          icon={ShieldCheck}
+          label="Weekly Focus"
+          value={`${analytics.weeklyFocusHours || 0}h`}
+          meta={`Best: ${analytics.bestFocusDay || "None"}`}
+          icon={TimerReset}
         />
         <StatCard
           label="Active Goals"
-          value={dashboardAnalytics?.goalSummary?.activeGoals || 0}
-          meta={`${dashboardAnalytics?.goalSummary?.averageProgress || 0}% avg progress`}
+          value={goals.activeGoals || 0}
+          meta={`${goals.averageProgress || 0}% avg progress`}
           icon={Target}
         />
         <StatCard
           label="Discipline Score"
-          value={`${dashboardAnalytics?.disciplineScore?.totalXp || 0} XP`}
-          meta={`Rank ${dashboardAnalytics?.currentRank || "D"} - ${dashboardAnalytics?.disciplineScore?.progressPercentage || 0}%`}
+          value={`${discipline.totalXp || 0} XP`}
+          meta={`Rank ${discipline.currentRank || "D"} - ${discipline.progressPercentage || 0}%`}
           icon={Gauge}
         />
         <StatCard
           label="Current Streak"
-          value={`${dashboardAnalytics?.currentStreak || 0} days`}
-          meta={`Best: ${dashboardAnalytics?.bestStreak || 0}`}
+          value={`${streak.currentStreak || 0} days`}
+          meta={`Best: ${streak.bestStreak || 0}`}
           icon={Flame}
         />
         <StatCard
           label="Completion Rate"
-          value={`${dashboardAnalytics?.quickStatistics?.completionRate || 0}%`}
-          meta="Tracked days"
+          value={`${streak.completionRate || 0}%`}
+          meta={`${streak.thisWeekCompletedDays || 0} days this week`}
           icon={Activity}
         />
         <StatCard
-          label="Next Milestone"
-          value={dashboardAnalytics?.quickStatistics?.nextMilestone || 7}
-          meta={`${dashboardAnalytics?.quickStatistics?.completionRate || 0}% consistency`}
+          label="Achievements"
+          value={achievements.unlockedCount || 0}
+          meta={`${achievements.completionPercentage || 0}% unlocked`}
           icon={Trophy}
         />
       </div>
       <div className="content-grid two-one">
         <Card title="Weekly Focus Chart" label="Hours locked">
           <MiniBarChart
-            values={(dashboardAnalytics?.weeklyFocusHours || []).map(
-              (item) => item.hours,
+            values={(analytics.weeklyFocusTrend || []).map(
+              (item) => item.hours || 0,
             )}
           />
         </Card>
@@ -703,11 +701,23 @@ export function DashboardPage() {
             </ActionLink>
             <ActionLink
               onClick={() =>
-                navigate(currentMission ? "/active-mission" : "/mission-center")
+                navigate(
+                  hasActiveMission ? "/active-mission" : "/mission-center",
+                )
               }
             >
-              {currentMission ? "Continue Mission" : "Start Mission"}
+              {hasActiveMission ? "Continue Mission" : "Start Mission"}
             </ActionLink>
+            {!quickActions.hasGoals && (
+              <ActionLink onClick={() => navigate("/goals")}>
+                Create Goal
+              </ActionLink>
+            )}
+            {!quickActions.hasConsumptionLimits && (
+              <ActionLink onClick={() => navigate("/consumption-control")}>
+                Set Limits
+              </ActionLink>
+            )}
             <ActionLink onClick={() => navigate("/mission-center")}>
               Mission Center
             </ActionLink>
@@ -720,11 +730,6 @@ export function DashboardPage() {
             <ActionLink onClick={() => navigate("/goals")}>
               Goals Hub
             </ActionLink>
-            {!currentMission && readyMission && (
-              <ActionLink onClick={() => navigate("/mission-center")}>
-                Continue Editing
-              </ActionLink>
-            )}
             <ActionLink onClick={() => navigate("/block-manager")}>
               Update Blocks
             </ActionLink>
@@ -732,8 +737,38 @@ export function DashboardPage() {
         </Card>
       </div>
       <Card
+        title="Current Mission"
+        label={hasActiveMission ? currentMission.status : "No active session"}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() =>
+              navigate(hasActiveMission ? "/active-mission" : "/mission-center")
+            }
+          >
+            {hasActiveMission ? "Continue" : "Start Mission"}
+          </Button>
+        }
+      >
+        <div className="list-stack">
+          <div className="card-row">
+            <span>{currentMission?.missionTitle || "No mission running"}</span>
+            <strong>
+              {hasActiveMission
+                ? formatClock(currentMission.remainingSeconds)
+                : "Ready"}
+            </strong>
+          </div>
+          <p className="muted-text">
+            {currentMission?.goal ||
+              "Choose a ready mission to begin a focused session."}
+          </p>
+          <ProgressBar value={currentMission?.progressPercentage || 0} />
+        </div>
+      </Card>
+      <Card
         title="Monthly Review Snapshot"
-        label={dashboardMonthlyReview?.monthLabel || "Current month"}
+        label="Current month"
         action={
           <Button
             variant="secondary"
@@ -744,29 +779,22 @@ export function DashboardPage() {
         }
       >
         <div className="review-grid compact-review">
-          <ReviewStatCard
-            label="Grade"
-            value={dashboardMonthlyReview?.grade || "F"}
-          />
+          <ReviewStatCard label="Grade" value={monthly.grade || "F"} />
           <ReviewStatCard
             label="Score"
-            value={`${dashboardMonthlyReview?.overallScore || 0}/100`}
+            value={`${monthly.monthlyScore || 0}/100`}
           />
+          <ReviewStatCard label="Focus" value={`${monthly.focusHours || 0}h`} />
           <ReviewStatCard
-            label="Focus"
-            value={`${dashboardMonthlyReview?.statistics?.totalFocusHours || 0}h`}
-          />
-          <ReviewStatCard
-            label="Identity"
-            value={
-              dashboardMonthlyReview?.identity?.title || "Discipline Beginner"
-            }
+            label="XP Earned"
+            value={`+${monthly.xpEarned || 0}`}
           />
         </div>
+        <p className="muted-text">{monthly.keyInsight}</p>
       </Card>
       <Card
         title="Weekly Review Snapshot"
-        label={dashboardWeeklyReview?.week?.range || "Current week"}
+        label="Current week"
         action={
           <Button
             variant="secondary"
@@ -777,23 +805,18 @@ export function DashboardPage() {
         }
       >
         <div className="review-grid compact-review">
-          <ReviewStatCard
-            label="Grade"
-            value={dashboardWeeklyReview?.grade || "F"}
-          />
+          <ReviewStatCard label="Grade" value={weekly.grade || "F"} />
           <ReviewStatCard
             label="Score"
-            value={`${dashboardWeeklyReview?.overallScore || 0}/100`}
+            value={`${weekly.weeklyScore || 0}/100`}
           />
-          <ReviewStatCard
-            label="Focus"
-            value={`${dashboardWeeklyReview?.statistics?.focusHours || 0}h`}
-          />
+          <ReviewStatCard label="Focus" value={`${weekly.focusHours || 0}h`} />
           <ReviewStatCard
             label="Success"
-            value={`${dashboardWeeklyReview?.statistics?.missionSuccessRate || 0}%`}
+            value={`${weekly.completionRate || 0}%`}
           />
         </div>
+        <p className="muted-text">{weekly.keyInsight}</p>
       </Card>
       <Card
         title="Identity Summary"
@@ -807,19 +830,16 @@ export function DashboardPage() {
         <div className="review-grid compact-review">
           <ReviewStatCard
             label="Title"
-            value={identitySummary?.currentTitle || "Discipline Beginner"}
+            value={userSummary.identityTitle || "Discipline Beginner"}
           />
           <ReviewStatCard
-            label="Score"
-            value={`${identitySummary?.identityScore || 0}/100`}
+            label="Member Since"
+            value={formatDate(userSummary.memberSince)}
           />
+          <ReviewStatCard label="Email" value={userSummary.email || "-"} />
           <ReviewStatCard
-            label="Tier"
-            value={identitySummary?.currentTier || "STARTER"}
-          />
-          <ReviewStatCard
-            label="Strongest Trait"
-            value={identitySummary?.strongestTrait?.name || "None yet"}
+            label="Full Name"
+            value={userSummary.fullName || "Operator"}
           />
         </div>
       </Card>
@@ -833,23 +853,18 @@ export function DashboardPage() {
         }
       >
         <div className="review-grid compact-review">
-          <ReviewStatCard
-            label="Active Goals"
-            value={dashboardAnalytics?.goalSummary?.activeGoals || 0}
-          />
+          <ReviewStatCard label="Active Goals" value={goals.activeGoals || 0} />
           <ReviewStatCard
             label="Average Progress"
-            value={`${dashboardAnalytics?.goalSummary?.averageProgress || 0}%`}
+            value={`${goals.averageProgress || 0}%`}
           />
           <ReviewStatCard
             label="Completed Goals"
-            value={dashboardAnalytics?.goalSummary?.completedGoals || 0}
+            value={goals.completedGoals || 0}
           />
           <ReviewStatCard
             label="Top Active Goal"
-            value={
-              dashboardAnalytics?.goalSummary?.topActiveGoal?.title || "None"
-            }
+            value={goals.topActiveGoal?.title || "None"}
           />
         </div>
       </Card>
@@ -865,19 +880,19 @@ export function DashboardPage() {
         <div className="review-grid compact-review">
           <ReviewStatCard
             label="Unlocked"
-            value={achievementSummary?.unlocked || 0}
+            value={achievements.unlockedCount || 0}
           />
           <ReviewStatCard
             label="Total"
-            value={achievementSummary?.totalAchievements || 0}
+            value={achievements.totalAchievements || 0}
           />
           <ReviewStatCard
             label="Completion"
-            value={`${achievementSummary?.completionPercentage || 0}%`}
+            value={`${achievements.completionPercentage || 0}%`}
           />
           <ReviewStatCard
-            label="XP Earned"
-            value={`+${achievementSummary?.xpFromAchievements || 0}`}
+            label="Latest"
+            value={achievements.latestAchievement?.title || "None yet"}
           />
         </div>
       </Card>
@@ -895,32 +910,80 @@ export function DashboardPage() {
       >
         <div className="review-grid compact-review">
           <ReviewStatCard
-            label="Today's Focus"
-            value={`${dashboardAnalytics?.todayFocus || 0}h`}
+            label="Reels Today"
+            value={consumption.reelsToday || 0}
           />
           <ReviewStatCard
-            label="Today's Sessions"
-            value={dashboardAnalytics?.todaySessions || 0}
+            label="Shorts Today"
+            value={consumption.shortsToday || 0}
           />
           <ReviewStatCard
-            label="Weekly Focus"
-            value={`${(dashboardAnalytics?.weeklyFocusHours || []).reduce((sum, item) => sum + (item.hours || 0), 0).toFixed(1)}h`}
+            label="Videos Today"
+            value={consumption.totalVideosToday || 0}
           />
           <ReviewStatCard
             label="Healthy Consumption"
-            value={`${dashboardAnalytics?.todayConsumptionScore || 100}%`}
+            value={`${consumption.consumptionScore ?? 100}%`}
+          />
+        </div>
+      </Card>
+      <Card title="Mission Stats" label="Execution health">
+        <div className="review-grid compact-review">
+          <ReviewStatCard
+            label="Total Missions"
+            value={missionStats.totalMissions || 0}
+          />
+          <ReviewStatCard
+            label="Ready"
+            value={missionStats.readyMissions || 0}
+          />
+          <ReviewStatCard
+            label="Archived"
+            value={missionStats.archivedMissions || 0}
+          />
+          <ReviewStatCard
+            label="Completed Sessions"
+            value={missionStats.completedSessions || 0}
+          />
+          <ReviewStatCard
+            label="Abandoned Sessions"
+            value={missionStats.abandonedSessions || 0}
+          />
+          <ReviewStatCard
+            label="Success Rate"
+            value={`${missionStats.successRate || 0}%`}
+          />
+        </div>
+      </Card>
+      <Card title="Analytics Snapshot" label="Today and this week">
+        <div className="review-grid compact-review">
+          <ReviewStatCard
+            label="Today Focus"
+            value={`${analytics.todayFocusMinutes || 0}m`}
+          />
+          <ReviewStatCard
+            label="Weekly Focus"
+            value={`${analytics.weeklyFocusHours || 0}h`}
+          />
+          <ReviewStatCard
+            label="Best Focus Day"
+            value={analytics.bestFocusDay || "None"}
+          />
+          <ReviewStatCard
+            label="Time Saved"
+            value={analytics.totalTimeSaved || "0m"}
           />
         </div>
       </Card>
       <Card title="Recent Sessions" label="Last activity">
         <div className="list-stack">
-          {recentHistory.items.map((session) => (
+          {recentSessions.map((session) => (
             <SessionCard
               key={session.id}
               session={sessionCardFromHistory(session)}
             />
           ))}
-          {recentHistory.items.length === 0 && (
+          {recentSessions.length === 0 && (
             <p className="muted-text">
               No completed or abandoned sessions yet.
             </p>
