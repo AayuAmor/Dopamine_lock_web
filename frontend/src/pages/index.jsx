@@ -53,6 +53,7 @@ import { useConsumption } from "../hooks/useConsumption";
 import { useDisciplineScore } from "../hooks/useDisciplineScore";
 import { useAchievements } from "../hooks/useAchievements";
 import { useGoals } from "../hooks/useGoals";
+import { useIdentity } from "../hooks/useIdentity";
 import { useMissions } from "../hooks/useMissions";
 import { useMissionSession } from "../hooks/useMissionSession";
 import { useSessionHistory } from "../hooks/useSessionHistory";
@@ -104,6 +105,7 @@ import {
   startMission,
 } from "../services/missionSessionService";
 import { recalculate as recalculateAchievements } from "../services/achievementService";
+import { recalculate as recalculateIdentity } from "../services/identityService";
 import { getSession as getHistorySession } from "../services/sessionHistoryService";
 
 const missionRules = [
@@ -294,26 +296,6 @@ function formatDateTime(value) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function identityTitleFromRank(rank) {
-  if (rank === "S+") {
-    return "Discipline Master";
-  }
-
-  if (rank === "S") {
-    return "Deep Work Beast";
-  }
-
-  if (rank === "A") {
-    return "Disciplined Builder";
-  }
-
-  if (rank === "B") {
-    return "Focus Builder";
-  }
-
-  return "Discipline Beginner";
 }
 
 function sessionTimelineGroup(value) {
@@ -627,6 +609,7 @@ export function DashboardPage() {
   const { user } = useAuth();
   const { data: dashboardAnalytics } = useAnalytics(getDashboard);
   const { summary: achievementSummary } = useAchievements();
+  const { summary: identitySummary } = useIdentity();
   const { effectiveRules } = useBlockManager();
   const { history: recentHistory } = useSessionHistory({
     limit: 3,
@@ -748,6 +731,34 @@ export function DashboardPage() {
         </Card>
       </div>
       <Card
+        title="Identity Summary"
+        label="Who you are becoming"
+        action={
+          <Button variant="secondary" onClick={() => navigate("/identity")}>
+            Open Identity
+          </Button>
+        }
+      >
+        <div className="review-grid compact-review">
+          <ReviewStatCard
+            label="Title"
+            value={identitySummary?.currentTitle || "Discipline Beginner"}
+          />
+          <ReviewStatCard
+            label="Score"
+            value={`${identitySummary?.identityScore || 0}/100`}
+          />
+          <ReviewStatCard
+            label="Tier"
+            value={identitySummary?.currentTier || "STARTER"}
+          />
+          <ReviewStatCard
+            label="Strongest Trait"
+            value={identitySummary?.strongestTrait?.name || "None yet"}
+          />
+        </div>
+      </Card>
+      <Card
         title="Goal Progress Summary"
         label="Long-term outcomes"
         action={
@@ -780,13 +791,29 @@ export function DashboardPage() {
       <Card
         title="Achievement Snapshot"
         label="Milestones unlocked"
-        action={<Button variant="secondary" onClick={() => navigate("/achievements")}>View All</Button>}
+        action={
+          <Button variant="secondary" onClick={() => navigate("/achievements")}>
+            View All
+          </Button>
+        }
       >
         <div className="review-grid compact-review">
-          <ReviewStatCard label="Unlocked" value={achievementSummary?.unlocked || 0} />
-          <ReviewStatCard label="Total" value={achievementSummary?.totalAchievements || 0} />
-          <ReviewStatCard label="Completion" value={`${achievementSummary?.completionPercentage || 0}%`} />
-          <ReviewStatCard label="XP Earned" value={`+${achievementSummary?.xpFromAchievements || 0}`} />
+          <ReviewStatCard
+            label="Unlocked"
+            value={achievementSummary?.unlocked || 0}
+          />
+          <ReviewStatCard
+            label="Total"
+            value={achievementSummary?.totalAchievements || 0}
+          />
+          <ReviewStatCard
+            label="Completion"
+            value={`${achievementSummary?.completionPercentage || 0}%`}
+          />
+          <ReviewStatCard
+            label="XP Earned"
+            value={`+${achievementSummary?.xpFromAchievements || 0}`}
+          />
         </div>
       </Card>
       <Card
@@ -861,7 +888,11 @@ export function ProfilePage() {
     profileCalendarDate.month,
     profileCalendarDate.year,
   );
-  const { summary: profileAchievementSummary, achievements: profileAchievements } = useAchievements();
+  const {
+    summary: profileAchievementSummary,
+    achievements: profileAchievements,
+  } = useAchievements();
+  const { summary: profileIdentitySummary } = useIdentity();
   const latestAchievement = profileAchievements
     .filter((a) => a.completed && a.unlockedAt)
     .sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt))[0];
@@ -1036,7 +1067,7 @@ export function ProfilePage() {
         <div>
           <p className="eyebrow">User Profile</p>
           <h2>{user?.fullName || "Operator"}</h2>
-          <p>{user?.disciplineTitle || "DISCIPLINED BUILDER"}</p>
+          <p>{profileIdentitySummary?.currentTitle || "Discipline Beginner"}</p>
           <span>{formatMemberSince(user?.createdAt)}</span>
         </div>
         <Badge label="Current Status: Active" />
@@ -1112,11 +1143,26 @@ export function ProfilePage() {
                 value={`${user?.preferredMissionDuration || 50} minutes`}
               />
               <ProfileDetail label="Timezone" value={user?.timezone} />
-              <ProfileDetail label="Achievements Unlocked" value={profileAchievementSummary?.unlocked || 0} />
-              <ProfileDetail label="Achievement Completion" value={`${profileAchievementSummary?.completionPercentage || 0}%`} />
-              <ProfileDetail label="Latest Achievement" value={latestAchievement?.title || "None yet"} />
-              <ProfileDetail label="Legendary Achievements" value={profileAchievementSummary?.legendaryUnlocked || 0} />
-              <ProfileDetail label="XP from Achievements" value={`+${profileAchievementSummary?.xpFromAchievements || 0}`} />
+              <ProfileDetail
+                label="Achievements Unlocked"
+                value={profileAchievementSummary?.unlocked || 0}
+              />
+              <ProfileDetail
+                label="Achievement Completion"
+                value={`${profileAchievementSummary?.completionPercentage || 0}%`}
+              />
+              <ProfileDetail
+                label="Latest Achievement"
+                value={latestAchievement?.title || "None yet"}
+              />
+              <ProfileDetail
+                label="Legendary Achievements"
+                value={profileAchievementSummary?.legendaryUnlocked || 0}
+              />
+              <ProfileDetail
+                label="XP from Achievements"
+                value={`+${profileAchievementSummary?.xpFromAchievements || 0}`}
+              />
             </div>
           ) : (
             <div className="form-stack">
@@ -2974,6 +3020,7 @@ export function DisciplineScorePage() {
 
 export function AnalyticsPage() {
   const { summary: analyticsSummary } = useAchievements();
+  const { summary: analyticsIdentitySummary } = useIdentity();
   const { data: overview } = useAnalytics(getOverview);
   const { data: focus } = useAnalytics(getFocus);
   const { data: missionAnalytics } = useAnalytics(getMissionAnalytics);
@@ -3064,6 +3111,18 @@ export function AnalyticsPage() {
           icon={Gauge}
         />
         <StatCard
+          label="Identity Title"
+          value={
+            analyticsIdentitySummary?.currentTitle || "Discipline Beginner"
+          }
+          icon={Trophy}
+        />
+        <StatCard
+          label="Identity Score"
+          value={`${analyticsIdentitySummary?.identityScore || 0}/100`}
+          icon={Gauge}
+        />
+        <StatCard
           label="Time Consumed"
           value={`${consumptionAnalytics?.totalMinutes || 0}m`}
           icon={Smartphone}
@@ -3102,29 +3161,58 @@ export function AnalyticsPage() {
 }
 
 export function AchievementsPage() {
-  const { achievements: userAchievements, summary, isLoading, error, refreshAchievements } = useAchievements();
+  const {
+    achievements: userAchievements,
+    summary,
+    isLoading,
+    error,
+    refreshAchievements,
+  } = useAchievements();
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
   const [recalcMsg, setRecalcMsg] = useState("");
 
-  const achievementCategories = ["MISSION", "STREAK", "FOCUS", "DISCIPLINE", "GOALS", "DIGITAL_WELLNESS", "SPECIAL"];
-  const achievementRarities = ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"];
+  const achievementCategories = [
+    "MISSION",
+    "STREAK",
+    "FOCUS",
+    "DISCIPLINE",
+    "GOALS",
+    "DIGITAL_WELLNESS",
+    "SPECIAL",
+  ];
+  const achievementRarities = [
+    "COMMON",
+    "UNCOMMON",
+    "RARE",
+    "EPIC",
+    "LEGENDARY",
+  ];
 
   const filtered = userAchievements.filter((achievement) => {
-    const matchesQuery = !query || achievement.title.toLowerCase().includes(query.toLowerCase()) || (achievement.description || "").toLowerCase().includes(query.toLowerCase());
-    const matchesCategory = !categoryFilter || achievement.category === categoryFilter;
+    const matchesQuery =
+      !query ||
+      achievement.title.toLowerCase().includes(query.toLowerCase()) ||
+      (achievement.description || "")
+        .toLowerCase()
+        .includes(query.toLowerCase());
+    const matchesCategory =
+      !categoryFilter || achievement.category === categoryFilter;
     const matchesRarity = !rarityFilter || achievement.rarity === rarityFilter;
     return matchesQuery && matchesCategory && matchesRarity;
   });
 
-  const group = (state) => filtered.filter((achievement) => achievement.state === state);
+  const group = (state) =>
+    filtered.filter((achievement) => achievement.state === state);
 
   const handleRecalculate = async () => {
     setRecalcMsg("");
     try {
       const result = await recalculateAchievements();
-      setRecalcMsg(`Recalculated — ${result.newlyUnlocked || 0} newly unlocked.`);
+      setRecalcMsg(
+        `Recalculated — ${result.newlyUnlocked || 0} newly unlocked.`,
+      );
       await refreshAchievements();
     } catch (err) {
       setRecalcMsg(err.message || "Recalculation failed");
@@ -3148,20 +3236,47 @@ export function AchievementsPage() {
       <div className="review-grid compact-review">
         <ReviewStatCard label="Unlocked" value={summary?.unlocked || 0} />
         <ReviewStatCard label="Total" value={summary?.totalAchievements || 0} />
-        <ReviewStatCard label="Completion" value={`${summary?.completionPercentage || 0}%`} />
-        <ReviewStatCard label="XP from Achievements" value={`+${summary?.xpFromAchievements || 0}`} />
+        <ReviewStatCard
+          label="Completion"
+          value={`${summary?.completionPercentage || 0}%`}
+        />
+        <ReviewStatCard
+          label="XP from Achievements"
+          value={`+${summary?.xpFromAchievements || 0}`}
+        />
       </div>
 
       <Card title="Filter Achievements" label="Search and filter">
         <div className="form-grid">
-          <Input label="Search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search achievements..." />
-          <Select label="Category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+          <Input
+            label="Search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search achievements..."
+          />
+          <Select
+            label="Category"
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+          >
             <option value="">All Categories</option>
-            {achievementCategories.map((cat) => <option key={cat} value={cat}>{cat.replace("_", " ")}</option>)}
+            {achievementCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat.replace("_", " ")}
+              </option>
+            ))}
           </Select>
-          <Select label="Rarity" value={rarityFilter} onChange={(event) => setRarityFilter(event.target.value)}>
+          <Select
+            label="Rarity"
+            value={rarityFilter}
+            onChange={(event) => setRarityFilter(event.target.value)}
+          >
             <option value="">All Rarities</option>
-            {achievementRarities.map((r) => <option key={r} value={r}>{r}</option>)}
+            {achievementRarities.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </Select>
         </div>
         {recalcMsg && <p className="success-text">{recalcMsg}</p>}
@@ -3171,13 +3286,22 @@ export function AchievementsPage() {
       {isLoading && <p className="muted-text">Loading achievements...</p>}
 
       {["Unlocked", "Progress", "Locked"].map((state) => (
-        <Card key={state} title={`${state} Badges`} label={`${group(state).length} achievements`}>
+        <Card
+          key={state}
+          title={`${state} Badges`}
+          label={`${group(state).length} achievements`}
+        >
           <div className="achievement-grid">
             {group(state).map((achievement) => (
-              <AchievementBadge key={achievement.id} achievement={achievement} />
+              <AchievementBadge
+                key={achievement.id}
+                achievement={achievement}
+              />
             ))}
             {group(state).length === 0 && (
-              <p className="muted-text">No {state.toLowerCase()} achievements match your filter.</p>
+              <p className="muted-text">
+                No {state.toLowerCase()} achievements match your filter.
+              </p>
             )}
           </div>
         </Card>
@@ -3692,97 +3816,172 @@ function ReviewPage({ title, range, data = {}, summary }) {
 
 export function IdentityPage() {
   const { user } = useAuth();
-  const { identity: consumptionIdentity } = useConsumption();
-  const { summary: goalIdentitySummary } = useGoals();
-  const { summary: identityAchievementSummary, achievements: identityAchievements } = useAchievements();
-  const mostPrestigiousAchievement = identityAchievements
-    .filter((a) => a.completed)
-    .sort((a, b) => {
-      const rarityOrder = { LEGENDARY: 5, EPIC: 4, RARE: 3, UNCOMMON: 2, COMMON: 1 };
-      return (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
-    })[0];
-  const latestIdentityAchievement = identityAchievements
-    .filter((a) => a.completed && a.unlockedAt)
-    .sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt))[0];
-  const { score: identityScore } = useDisciplineScore();
-  const [identityCalendarDate] = useState(() => {
-    const now = new Date();
-    return {
-      month: now.getMonth() + 1,
-      year: now.getFullYear(),
-    };
-  });
-  const { summary: identityStreakSummary } = useStreak(
-    identityCalendarDate.month,
-    identityCalendarDate.year,
-  );
-  const identityTitle = identityTitleFromRank(
-    identityScore?.currentRank || "D",
-  );
+  const { error, identity, isLoading, progression, refreshIdentity, traits } =
+    useIdentity();
+  const [actionMessage, setActionMessage] = useState("");
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
+  async function handleRecalculateIdentity() {
+    try {
+      setIsRecalculating(true);
+      setActionMessage("");
+      await recalculateIdentity();
+      await refreshIdentity();
+      setActionMessage("Identity recalculated.");
+    } catch (recalculateError) {
+      setActionMessage(
+        recalculateError.message || "Unable to recalculate identity",
+      );
+    } finally {
+      setIsRecalculating(false);
+    }
+  }
 
   return (
     <>
-      <Card className="identity-card">
+      {error && <p className="form-message form-error">{error}</p>}
+      {actionMessage && (
+        <p
+          className={`form-message ${actionMessage.includes("recalculated") ? "form-success" : "form-error"}`}
+        >
+          {actionMessage}
+        </p>
+      )}
+      <Card
+        className="identity-card"
+        action={
+          <Button
+            variant="secondary"
+            onClick={handleRecalculateIdentity}
+            disabled={isRecalculating || isLoading}
+          >
+            <RefreshCcw size={15} />
+            {isRecalculating ? "Recalculating..." : "Recalculate"}
+          </Button>
+        }
+      >
         <UserAvatar user={user} size="lg" />
         <p className="eyebrow">Identity Title</p>
-        <strong>{identityTitle}</strong>
+        <strong>{identity?.currentTitle || "Discipline Beginner"}</strong>
         <p>
-          {user?.bio ||
-            '"I do not negotiate with impulses during mission hours."'}
+          {identity?.identityStatement ||
+            "Every disciplined person starts with one completed mission."}
         </p>
+        <ProgressBar value={identity?.identityScore || 0} />
+        <div className="card-row">
+          <span>Identity Score</span>
+          <strong>{identity?.identityScore || 0}/100</strong>
+        </div>
+        <div className="card-row">
+          <span>Tier</span>
+          <strong>{identity?.currentTier || "STARTER"}</strong>
+        </div>
       </Card>
+
       <div className="stats-grid">
         <StatCard
-          label="Long-term Goals Completed"
-          value={goalIdentitySummary?.completedGoals || 0}
-          icon={CheckCircle2}
+          label="Strongest Trait"
+          value={identity?.strongestTrait?.name || "None yet"}
+          meta={identity?.strongestTrait?.status}
+          icon={Trophy}
         />
         <StatCard
-          label="Active Transformation Goal"
-          value={goalIdentitySummary?.topActiveGoal?.title || "None"}
-          icon={Target}
-        />
-        <StatCard label="Achievements Unlocked" value={identityAchievementSummary?.unlocked || 0} icon={Trophy} />
-        <StatCard label="Most Prestigious" value={mostPrestigiousAchievement?.title || "None yet"} icon={Trophy} />
-        <StatCard label="Latest Achievement" value={latestIdentityAchievement?.title || "None yet"} icon={CheckCircle2} />
-        <StatCard label="Achievement Completion" value={`${identityAchievementSummary?.completionPercentage || 0}%`} icon={Activity} />
-        <StatCard
-          label="Current Streak"
-          value={`${identityStreakSummary?.currentStreak || 0} days`}
-          icon={Flame}
+          label="Weakest Trait"
+          value={identity?.weakestTrait?.name || "None yet"}
+          meta={identity?.weakestTrait?.status}
+          icon={Activity}
         />
         <StatCard
-          label="Discipline Rank"
-          value={identityScore?.currentRank || "D"}
-          meta={`${identityScore?.totalXp || 0} XP`}
-          icon={Gauge}
-        />
-        <StatCard
-          label="Goal Consistency"
-          value={`${goalIdentitySummary?.averageProgress || 0}%`}
-          icon={ShieldCheck}
-        />
-        <StatCard
-          label="Healthy Consumption Days"
-          value={consumptionIdentity?.healthyDays || 0}
-          icon={ShieldCheck}
-        />
-        <StatCard
-          label="Videos Avoided"
-          value={consumptionIdentity?.videosAvoided || 0}
-          icon={Ban}
-        />
-        <StatCard
-          label="Time Saved"
-          value={consumptionIdentity?.timeSaved || "0m"}
+          label="Member Since"
+          value={formatMemberSince(
+            identity?.memberSince || user?.createdAt,
+          ).replace("Member since ", "")}
           icon={Clock}
         />
         <StatCard
+          label="Current Streak"
+          value={`${identity?.currentStreak || 0} days`}
+          icon={Flame}
+        />
+        <StatCard
+          label="Best Streak"
+          value={`${identity?.bestStreak || 0} days`}
+          icon={Flame}
+        />
+        <StatCard
+          label="Focus Hours"
+          value={`${identity?.totalFocusHours || 0}h`}
+          icon={Clock}
+        />
+        <StatCard
+          label="Completed Missions"
+          value={identity?.completedMissions || 0}
+          icon={CheckCircle2}
+        />
+        <StatCard
+          label="Goals Completed"
+          value={identity?.goalsCompleted || 0}
+          icon={Target}
+        />
+        <StatCard
+          label="Achievements"
+          value={identity?.achievementsUnlocked || 0}
+          meta={`${identity?.achievementCompletionPercentage || 0}% complete`}
+          icon={Trophy}
+        />
+        <StatCard
           label="Digital Discipline Rating"
-          value={consumptionIdentity?.rating || "D"}
+          value={identity?.digitalDisciplineRating || "D"}
+          meta={`${identity?.consumptionScore || 0}% control`}
+          icon={Gauge}
+        />
+        <StatCard
+          label="Discipline Rank"
+          value={identity?.disciplineRank || "D"}
           icon={Gauge}
         />
       </div>
+
+      <Card title="Identity Traits" label="Backend-calculated behavior profile">
+        <div className="list-stack">
+          {traits.map((trait) => (
+            <div key={trait.name}>
+              <div className="card-row">
+                <span>{trait.name}</span>
+                <strong>
+                  {trait.status} · {trait.score}%
+                </strong>
+              </div>
+              <ProgressBar value={trait.score} />
+              <p className="muted-text">{trait.explanation}</p>
+            </div>
+          ))}
+          {traits.length === 0 && (
+            <p className="muted-text">
+              Identity traits will appear after calculation.
+            </p>
+          )}
+        </div>
+      </Card>
+
+      <Card title="Identity Timeline" label="Progression snapshots">
+        <div className="list-stack">
+          {progression.map((snapshot) => (
+            <div
+              className="card-row"
+              key={snapshot.id || `${snapshot.snapshotDate}-${snapshot.title}`}
+            >
+              <span>{formatDate(snapshot.snapshotDate)}</span>
+              <strong>
+                {snapshot.title} · {snapshot.score}/100
+              </strong>
+            </div>
+          ))}
+          {progression.length === 0 && (
+            <p className="muted-text">No identity snapshots yet.</p>
+          )}
+        </div>
+      </Card>
     </>
   );
 }

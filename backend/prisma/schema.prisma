@@ -133,6 +133,8 @@ model User {
   consumptionDailySummaries ConsumptionDailySummary[]
   goals                     Goal[]
   userAchievements          UserAchievement[]
+  userIdentity              UserIdentity?
+  identitySnapshots         IdentitySnapshot[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
@@ -246,6 +248,39 @@ model UserAchievement {
   @@index([userId], map: "idx_user_achievements_user_id")
   @@index([userId, completed], map: "idx_user_achievements_user_completed")
   @@map("user_achievements")
+}
+
+model UserIdentity {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique @map("user_id")
+  currentTitle      String   @map("current_title") @db.VarChar(100)
+  currentTier       String   @map("current_tier") @db.VarChar(40)
+  identityScore     Int      @default(0) @map("identity_score")
+  identityStatement String   @map("identity_statement") @db.VarChar(500)
+  strongestTrait    String?  @map("strongest_trait") @db.VarChar(100)
+  weakestTrait      String?  @map("weakest_trait") @db.VarChar(100)
+  calculatedAt      DateTime @default(now()) @map("calculated_at") @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_user_identities_user_id")
+  @@map("user_identities")
+}
+
+model IdentitySnapshot {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  title        String   @db.VarChar(100)
+  tier         String   @db.VarChar(40)
+  score        Int
+  snapshotDate DateTime @map("snapshot_date") @db.Date
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, snapshotDate], map: "identity_snapshots_user_snapshot_date_key")
+  @@index([userId, snapshotDate], map: "idx_identity_snapshots_user_date")
+  @@map("identity_snapshots")
 }
 
 model MissionSession {

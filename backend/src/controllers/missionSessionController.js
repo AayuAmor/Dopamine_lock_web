@@ -10,6 +10,9 @@ const {
 const {
   checkAndUnlockAchievements,
 } = require("../services/achievementService");
+const {
+  scheduleIdentityRecalculation,
+} = require("../services/identityService");
 
 function handleSessionError(error, res, fallbackMessage) {
   if (error.statusCode) {
@@ -81,6 +84,7 @@ async function completeSession(req, res) {
     checkAndUnlockAchievements(req.user.id).catch((err) =>
       console.error("Achievement check failed after session complete:", err),
     );
+    scheduleIdentityRecalculation(req.user.id, "session complete");
   } catch (error) {
     return handleSessionError(error, res, "Unable to complete mission session");
   }
@@ -94,6 +98,7 @@ async function abandonSession(req, res) {
     checkAndUnlockAchievements(req.user.id).catch((err) =>
       console.error("Achievement check failed after session abandon:", err),
     );
+    scheduleIdentityRecalculation(req.user.id, "session abandon");
   } catch (error) {
     return handleSessionError(error, res, "Unable to abandon mission session");
   }

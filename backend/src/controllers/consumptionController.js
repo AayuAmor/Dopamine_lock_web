@@ -9,95 +9,148 @@ const {
   getUserLimits,
   getWeeklyAnalytics,
   updateLimits,
-} = require('../services/consumptionService')
+} = require("../services/consumptionService");
+const {
+  scheduleIdentityRecalculation,
+} = require("../services/identityService");
 
 function handleConsumptionError(error, res, fallbackMessage) {
   if (error.statusCode) {
-    return res.status(error.statusCode).json({ message: error.message })
+    return res.status(error.statusCode).json({ message: error.message });
   }
 
-  console.error(fallbackMessage, error)
-  return res.status(500).json({ message: fallbackMessage })
+  console.error(fallbackMessage, error);
+  return res.status(500).json({ message: fallbackMessage });
 }
 
 async function summary(req, res) {
   try {
-    return res.json({ summary: await getConsumptionSummary(req.user.id) })
+    return res.json({ summary: await getConsumptionSummary(req.user.id) });
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to load consumption summary')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to load consumption summary",
+    );
   }
 }
 
 async function platforms(req, res) {
   try {
-    return res.json({ platforms: await getPlatformUsage(req.user.id) })
+    return res.json({ platforms: await getPlatformUsage(req.user.id) });
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to load consumption platforms')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to load consumption platforms",
+    );
   }
 }
 
 async function limits(req, res) {
   try {
-    return res.json({ limits: await getUserLimits(req.user.id) })
+    return res.json({ limits: await getUserLimits(req.user.id) });
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to load consumption limits')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to load consumption limits",
+    );
   }
 }
 
 async function updateUserLimits(req, res) {
   try {
-    return res.json({ limits: await updateLimits(req.user.id, req.body) })
+    const limits = await updateLimits(req.user.id, req.body);
+    res.json({ limits });
+    scheduleIdentityRecalculation(req.user.id, "consumption limit update");
+    return undefined;
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to update consumption limits')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to update consumption limits",
+    );
   }
 }
 
 async function logs(req, res) {
   try {
-    return res.json({ logs: await getLogs(req.user.id) })
+    return res.json({ logs: await getLogs(req.user.id) });
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to load consumption logs')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to load consumption logs",
+    );
   }
 }
 
 async function createManualLog(req, res) {
   try {
-    return res.status(201).json({ log: await createLog(req.user.id, req.body) })
+    const log = await createLog(req.user.id, req.body);
+    res.status(201).json({ log });
+    scheduleIdentityRecalculation(req.user.id, "consumption log");
+    return undefined;
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to create consumption log')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to create consumption log",
+    );
   }
 }
 
 async function deleteUserLog(req, res) {
   try {
-    await deleteLog(req.user.id, req.logId)
-    return res.status(204).send()
+    await deleteLog(req.user.id, req.logId);
+    res.status(204).send();
+    scheduleIdentityRecalculation(req.user.id, "consumption log delete");
+    return undefined;
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to delete consumption log')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to delete consumption log",
+    );
   }
 }
 
 async function timeline(req, res) {
   try {
-    return res.json({ timeline: await getTimeline(req.user.id) })
+    return res.json({ timeline: await getTimeline(req.user.id) });
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to load consumption timeline')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to load consumption timeline",
+    );
   }
 }
 
 async function weekly(req, res) {
   try {
-    return res.json({ weekly: await getWeeklyAnalytics(req.user.id) })
+    return res.json({ weekly: await getWeeklyAnalytics(req.user.id) });
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to load weekly consumption analytics')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to load weekly consumption analytics",
+    );
   }
 }
 
 async function identity(req, res) {
   try {
-    return res.json({ identity: await getIdentityConsumptionStats(req.user.id) })
+    return res.json({
+      identity: await getIdentityConsumptionStats(req.user.id),
+    });
   } catch (error) {
-    return handleConsumptionError(error, res, 'Unable to load identity consumption statistics')
+    return handleConsumptionError(
+      error,
+      res,
+      "Unable to load identity consumption statistics",
+    );
   }
 }
 
@@ -112,4 +165,4 @@ module.exports = {
   timeline,
   updateUserLimits,
   weekly,
-}
+};

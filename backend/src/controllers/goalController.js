@@ -20,6 +20,9 @@ const {
 const {
   checkAndUnlockAchievements,
 } = require("../services/achievementService");
+const {
+  scheduleIdentityRecalculation,
+} = require("../services/identityService");
 
 function parsePositiveInt(value, label, res) {
   const id = Number(value);
@@ -161,6 +164,7 @@ async function completeGoal(req, res) {
     checkAndUnlockAchievements(req.user.id).catch((err) =>
       console.error("Achievement check failed after goal complete:", err),
     );
+    scheduleIdentityRecalculation(req.user.id, "goal complete");
   } catch (error) {
     return handleGoalError(error, res, "Unable to complete goal");
   }
