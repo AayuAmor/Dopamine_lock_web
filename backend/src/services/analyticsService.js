@@ -11,6 +11,7 @@ const {
   getScoreBreakdown,
   getScoreTrend,
 } = require("./disciplineScoreService");
+const { getGoalSummary } = require("./goalService");
 const {
   getCalendarMonth,
   getStreakSummary,
@@ -340,11 +341,12 @@ async function getFocusAnalytics(userId) {
 
 async function getOverview(userId, query = {}) {
   const range = getRange(query);
-  const [sessions, streak, discipline, consumption] = await Promise.all([
+  const [sessions, streak, discipline, consumption, goals] = await Promise.all([
     getSessionStats(userId, range),
     getStreakSummary(userId),
     getDisciplineScore(userId),
     getConsumptionStats(userId, range),
+    getGoalSummary(userId),
   ]);
   const firstSession = sessions.sessions[0];
   const lastSession = sessions.sessions[sessions.sessions.length - 1];
@@ -371,6 +373,10 @@ async function getOverview(userId, query = {}) {
     healthyConsumptionScore: consumption.healthyConsumptionScore,
     missionSuccessRate: sessions.missionSuccessRate,
     totalFocusHours: formatHours(sessions.focusMinutes),
+    totalGoals: goals.totalGoals,
+    completedGoals: goals.completedGoals,
+    averageGoalProgress: goals.averageProgress,
+    upcomingDeadlines: goals.upcomingDeadlines,
   };
 }
 
@@ -385,6 +391,7 @@ async function getDashboard(userId) {
     discipline,
     consumption,
     missions,
+    goals,
   ] = await Promise.all([
     prisma.missionSession.findFirst({
       include: { mission: true },
@@ -397,6 +404,7 @@ async function getDashboard(userId) {
     getDisciplineScore(userId),
     getConsumptionSummary(userId),
     prisma.mission.count({ where: { userId } }),
+    getGoalSummary(userId),
   ]);
 
   return {
@@ -411,7 +419,10 @@ async function getDashboard(userId) {
     currentRank: discipline.currentRank,
     currentStreak: streak.currentStreak,
     disciplineScore: discipline,
+    goalSummary: goals,
     quickStatistics: {
+      activeGoals: goals.activeGoals,
+      averageGoalProgress: goals.averageProgress,
       completionRate: streak.completionRate,
       nextMilestone: streak.nextMilestone,
       totalMissions: missions,
@@ -504,15 +515,17 @@ async function getStreakAnalytics(userId, query = {}) {
 async function getWeekly(userId) {
   const end = addDays(startOfUtcDay(), 1);
   const start = addDays(end, -7);
-  const [sessions, discipline, consumption, consistency] = await Promise.all([
-    getSessionStats(userId, { start, end }),
-    getDisciplineAnalytics(userId),
-    getConsumptionAnalytics(userId, {
-      startDate: dateKey(start),
-      endDate: dateKey(addDays(end, -1)),
-    }),
-    getWeeklyConsistency(userId),
-  ]);
+  const [sessions, discipline, consumption, consistency, goals] =
+    await Promise.all([
+      getSessionStats(userId, { start, end }),
+      getDisciplineAnalytics(userId),
+      getConsumptionAnalytics(userId, {
+        startDate: dateKey(start),
+        endDate: dateKey(addDays(end, -1)),
+      }),
+      getWeeklyConsistency(userId),
+      getGoalSummary(userId),
+    ]);
   const focus = await getFocusAnalytics(userId);
   const bestDay = focus.bestFocusDay;
   const worstDay = focus.worstFocusDay;
@@ -532,6 +545,7 @@ async function getWeekly(userId) {
     disciplineXp: discipline.xpEarnedThisWeek,
     failed: sessions.abandonedSessions,
     focusHours: formatHoursText(sessions.focusMinutes),
+    goals,
     range: `${dateKey(start)} - ${dateKey(addDays(end, -1))}`,
     sessions: sessions.totalSessions,
     summaryMessage:
@@ -547,12 +561,14 @@ async function getMonthly(userId, query = {}) {
   const month = Number(query.month || now.getUTCMonth() + 1);
   const year = Number(query.year || now.getUTCFullYear());
   const range = getRange({ month, year });
-  const [sessions, missions, discipline, consumption] = await Promise.all([
-    getSessionStats(userId, range),
-    getMissionStats(userId, range),
-    getDisciplineAnalytics(userId),
-    getConsumptionAnalytics(userId, { month, year }),
-  ]);
+  const [sessions, missions, discipline, consumption, goals] =
+    await Promise.all([
+      getSessionStats(userId, range),
+      getMissionStats(userId, range),
+      getDisciplineAnalytics(userId),
+      getConsumptionAnalytics(userId, { month, year }),
+      getGoalSummary(userId),
+    ]);
 
   return {
     analytics: {
@@ -565,6 +581,7 @@ async function getMonthly(userId, query = {}) {
     consumption,
     currentRank: discipline.rank,
     focusHours: formatHoursText(sessions.focusMinutes),
+    goals,
     missionSuccess: `${sessions.missionSuccessRate}%`,
     month: `${year}-${String(month).padStart(2, "0")}`,
     rankProgress: discipline.progress,

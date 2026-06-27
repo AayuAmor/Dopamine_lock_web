@@ -1,32 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 
 export function useAnalytics(loader, params, initialValue = null) {
-  const [data, setData] = useState(initialValue)
-  const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [data, setData] = useState(initialValue);
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let active = true
+    let active = true;
 
     async function loadAnalytics() {
-      setIsLoading(true)
-      setError('')
+      setIsLoading(true);
+      setError("");
       try {
-        const result = await loader(params)
-        if (active) setData(result)
+        const result = await loader(params);
+        if (active) setData(result);
       } catch (err) {
-        if (active) setError(err.message || 'Unable to load analytics')
+        if (active) setError(err.message || "Unable to load analytics");
       } finally {
-        if (active) setIsLoading(false)
+        if (active) setIsLoading(false);
       }
     }
 
-    loadAnalytics()
+    loadAnalytics();
 
     return () => {
-      active = false
-    }
-  }, [loader, JSON.stringify(params || {})])
+      active = false;
+    };
+  }, [loader, params]);
 
-  return { data, error, isLoading }
+  return { data, error, isLoading };
 }

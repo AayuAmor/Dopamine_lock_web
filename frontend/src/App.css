@@ -301,6 +301,22 @@
   gap: 12px;
 }
 
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.error-text {
+  color: var(--danger) !important;
+}
+
+.success-text {
+  color: var(--white) !important;
+}
+
 .field {
   display: grid;
   gap: 8px;
@@ -326,7 +342,7 @@ textarea {
   resize: vertical;
 }
 
-input[type='checkbox'] {
+input[type="checkbox"] {
   width: 16px;
   min-height: 16px;
   accent-color: var(--white);
@@ -759,18 +775,42 @@ input[type='checkbox'] {
   border-radius: 999px;
 }
 
-.node-a { left: 34px; top: 78px; }
-.node-b { left: 104px; top: 38px; }
-.node-c { left: 168px; top: 80px; }
-.node-d { right: 24px; top: 32px; }
+.node-a {
+  left: 34px;
+  top: 78px;
+}
+.node-b {
+  left: 104px;
+  top: 38px;
+}
+.node-c {
+  left: 168px;
+  top: 80px;
+}
+.node-d {
+  right: 24px;
+  top: 32px;
+}
 .bond {
   width: 76px;
   height: 2px;
   transform-origin: left center;
 }
-.bond-a { left: 51px; top: 86px; transform: rotate(-30deg); }
-.bond-b { left: 119px; top: 50px; transform: rotate(34deg); }
-.bond-c { left: 184px; top: 83px; transform: rotate(-40deg); }
+.bond-a {
+  left: 51px;
+  top: 86px;
+  transform: rotate(-30deg);
+}
+.bond-b {
+  left: 119px;
+  top: 50px;
+  transform: rotate(34deg);
+}
+.bond-c {
+  left: 184px;
+  top: 83px;
+  transform: rotate(-40deg);
+}
 
 .auth-screen {
   align-content: center;

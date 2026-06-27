@@ -65,6 +65,30 @@ enum ConsumptionLogSource {
   IMPORTED
 }
 
+enum GoalCategory {
+  STUDY
+  CODING
+  FITNESS
+  READING
+  PROJECT
+  DIGITAL_DETOX
+  CONSISTENCY
+  CUSTOM
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  ARCHIVED
+}
+
 model User {
   id                        Int                       @id @default(autoincrement())
   fullName                  String                    @map("full_name") @db.VarChar(120)
@@ -89,6 +113,7 @@ model User {
   consumptionLimits         ConsumptionLimit[]
   consumptionLogs           ConsumptionLog[]
   consumptionDailySummaries ConsumptionDailySummary[]
+  goals                     Goal[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
@@ -120,11 +145,53 @@ model Mission {
   updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessions              MissionSession[]
+  goalMissions          GoalMission[]
 
   @@index([userId], map: "idx_missions_user_id")
   @@index([userId, archived], map: "idx_missions_user_archived")
   @@index([userId, favorite], map: "idx_missions_user_favorite")
   @@map("missions")
+}
+
+model Goal {
+  id                 Int           @id @default(autoincrement())
+  userId             Int           @map("user_id")
+  title              String        @db.VarChar(160)
+  description        String?       @db.VarChar(1000)
+  category           GoalCategory
+  targetValue        Float?        @map("target_value")
+  currentValue       Float         @default(0) @map("current_value")
+  unit               String?       @db.VarChar(60)
+  progressPercentage Int           @default(0) @map("progress_percentage")
+  priority           GoalPriority
+  status             GoalStatus    @default(ACTIVE)
+  targetDate         DateTime?     @map("target_date") @db.Date
+  completedAt        DateTime?     @map("completed_at") @db.Timestamptz(6)
+  archived           Boolean       @default(false)
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalMissions       GoalMission[]
+
+  @@index([userId], map: "idx_goals_user_id")
+  @@index([userId, status], map: "idx_goals_user_status")
+  @@index([userId, archived], map: "idx_goals_user_archived")
+  @@index([userId, targetDate], map: "idx_goals_user_target_date")
+  @@map("goals")
+}
+
+model GoalMission {
+  id        Int      @id @default(autoincrement())
+  goalId    Int      @map("goal_id")
+  missionId Int      @map("mission_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  mission   Mission  @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, missionId], map: "goal_missions_goal_mission_key")
+  @@index([goalId], map: "idx_goal_missions_goal_id")
+  @@index([missionId], map: "idx_goal_missions_mission_id")
+  @@map("goal_missions")
 }
 
 model MissionSession {
