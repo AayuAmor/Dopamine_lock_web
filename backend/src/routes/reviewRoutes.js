@@ -1,23 +1,46 @@
-const express = require('express')
+const express = require("express");
+const {
+  currentMonthlyReview,
+  generateMonthlyReview,
+  monthReview,
+  monthlyHistory,
+} = require("../controllers/monthlyReviewController");
 const {
   currentWeeklyReview,
   generateWeeklyReview,
   weekReview,
   weeklyHistory,
-} = require('../controllers/weeklyReviewController')
-const requireAuth = require('../middleware/authMiddleware')
+} = require("../controllers/weeklyReviewController");
+const requireAuth = require("../middleware/authMiddleware");
+const {
+  validateMonthlyReviewParams,
+  validateMonthlyReviewQuery,
+} = require("../middleware/monthlyReviewValidation");
 const {
   validateWeekStart,
   validateWeeklyReviewQuery,
-} = require('../middleware/weeklyReviewValidation')
+} = require("../middleware/weeklyReviewValidation");
 
-const router = express.Router()
+const router = express.Router();
 
-router.use(requireAuth)
+router.use(requireAuth);
 
-router.get('/weekly', validateWeeklyReviewQuery, currentWeeklyReview)
-router.get('/weekly/history', weeklyHistory)
-router.get('/weekly/:weekStart', validateWeekStart, weekReview)
-router.post('/weekly/generate', validateWeeklyReviewQuery, generateWeeklyReview)
+router.get("/monthly", validateMonthlyReviewQuery, currentMonthlyReview);
+router.get("/monthly/history", monthlyHistory);
+router.post(
+  "/monthly/generate",
+  validateMonthlyReviewQuery,
+  generateMonthlyReview,
+);
+router.get("/monthly/:year/:month", validateMonthlyReviewParams, monthReview);
 
-module.exports = router
+router.get("/weekly", validateWeeklyReviewQuery, currentWeeklyReview);
+router.get("/weekly/history", weeklyHistory);
+router.get("/weekly/:weekStart", validateWeekStart, weekReview);
+router.post(
+  "/weekly/generate",
+  validateWeeklyReviewQuery,
+  generateWeeklyReview,
+);
+
+module.exports = router;
