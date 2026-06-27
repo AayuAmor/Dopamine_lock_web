@@ -14,6 +14,7 @@ const identityRoutes = require("./src/routes/identityRoutes");
 const missionSessionRoutes = require("./src/routes/missionSessionRoutes");
 const missionRoutes = require("./src/routes/missionRoutes");
 const profileRoutes = require("./src/routes/profileRoutes");
+const reviewRoutes = require("./src/routes/reviewRoutes");
 const sessionHistoryRoutes = require("./src/routes/sessionHistoryRoutes");
 const streakRoutes = require("./src/routes/streakRoutes");
 
@@ -63,6 +64,7 @@ app.use("/api/identity", identityRoutes);
 app.use("/api/mission-session", missionSessionRoutes);
 app.use("/api/missions", missionRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/reviews", reviewRoutes);
 app.use("/api/session-history", sessionHistoryRoutes);
 app.use("/api/streak", streakRoutes);
 
