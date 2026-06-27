@@ -89,6 +89,24 @@ enum GoalStatus {
   ARCHIVED
 }
 
+enum AchievementCategory {
+  MISSION
+  STREAK
+  FOCUS
+  DISCIPLINE
+  GOALS
+  DIGITAL_WELLNESS
+  SPECIAL
+}
+
+enum AchievementRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
 model User {
   id                        Int                       @id @default(autoincrement())
   fullName                  String                    @map("full_name") @db.VarChar(120)
@@ -114,6 +132,7 @@ model User {
   consumptionLogs           ConsumptionLog[]
   consumptionDailySummaries ConsumptionDailySummary[]
   goals                     Goal[]
+  userAchievements          UserAchievement[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
@@ -192,6 +211,41 @@ model GoalMission {
   @@index([goalId], map: "idx_goal_missions_goal_id")
   @@index([missionId], map: "idx_goal_missions_mission_id")
   @@map("goal_missions")
+}
+
+model Achievement {
+  id               Int                 @id @default(autoincrement())
+  code             String              @unique @db.VarChar(80)
+  title            String              @db.VarChar(140)
+  description      String              @db.VarChar(500)
+  icon             String              @default("trophy") @db.VarChar(60)
+  category         AchievementCategory
+  rarity           AchievementRarity
+  xpReward         Int                 @default(0) @map("xp_reward")
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  userAchievements UserAchievement[]
+
+  @@index([category], map: "idx_achievements_category")
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            Int         @id @default(autoincrement())
+  userId        Int         @map("user_id")
+  achievementId Int         @map("achievement_id")
+  unlockedAt    DateTime?   @map("unlocked_at") @db.Timestamptz(6)
+  progress      Int         @default(0)
+  completed     Boolean     @default(false)
+  metadata      Json        @default("{}")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId], map: "user_achievements_user_achievement_key")
+  @@index([userId], map: "idx_user_achievements_user_id")
+  @@index([userId, completed], map: "idx_user_achievements_user_completed")
+  @@map("user_achievements")
 }
 
 model MissionSession {

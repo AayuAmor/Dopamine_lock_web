@@ -1,11 +1,3 @@
-export const achievements = [
-  { id: 1, title: "First Mission", state: "Unlocked", progress: 100 },
-  { id: 2, title: "7 Day Streak", state: "Unlocked", progress: 100 },
-  { id: 3, title: "Focus Warrior", state: "Progress", progress: 72 },
-  { id: 4, title: "Deep Work Beast", state: "Progress", progress: 44 },
-  { id: 5, title: "Discipline Master", state: "Locked", progress: 12 },
-];
-
 export const analytics = {
   focusHours: [2, 3.5, 1.5, 4, 2.5, 5, 3],
   scoreTrend: [62, 65, 69, 68, 72, 76, 81],

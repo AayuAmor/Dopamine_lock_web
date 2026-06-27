@@ -3,6 +3,7 @@ require("dotenv").config();
 const cors = require("cors");
 const express = require("express");
 const path = require("path");
+const achievementRoutes = require("./src/routes/achievementRoutes");
 const analyticsRoutes = require("./src/routes/analyticsRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const blockManagerRoutes = require("./src/routes/blockManagerRoutes");
@@ -50,6 +51,7 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.use("/api/achievements", achievementRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/block-manager", blockManagerRoutes);

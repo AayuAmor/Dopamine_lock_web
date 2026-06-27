@@ -6,77 +6,96 @@ const {
   pauseCurrentSession,
   resumeCurrentSession,
   startMissionSession,
-} = require('../services/missionSessionService')
+} = require("../services/missionSessionService");
+const {
+  checkAndUnlockAchievements,
+} = require("../services/achievementService");
 
 function handleSessionError(error, res, fallbackMessage) {
   if (error.statusCode) {
-    return res.status(error.statusCode).json({ message: error.message })
+    return res.status(error.statusCode).json({ message: error.message });
   }
 
-  console.error(fallbackMessage, error)
-  return res.status(500).json({ message: fallbackMessage })
+  console.error(fallbackMessage, error);
+  return res.status(500).json({ message: fallbackMessage });
 }
 
 async function currentSession(req, res) {
   try {
-    const session = await getCurrentSession(req.user.id)
-    return res.json({ session })
+    const session = await getCurrentSession(req.user.id);
+    return res.json({ session });
   } catch (error) {
-    return handleSessionError(error, res, 'Unable to load current mission session')
+    return handleSessionError(
+      error,
+      res,
+      "Unable to load current mission session",
+    );
   }
 }
 
 async function sessionHistory(req, res) {
   try {
-    const sessions = await getSessionHistory(req.user.id)
-    return res.json({ sessions })
+    const sessions = await getSessionHistory(req.user.id);
+    return res.json({ sessions });
   } catch (error) {
-    return handleSessionError(error, res, 'Unable to load mission session history')
+    return handleSessionError(
+      error,
+      res,
+      "Unable to load mission session history",
+    );
   }
 }
 
 async function startSession(req, res) {
   try {
-    const session = await startMissionSession(req.user.id, req.missionId)
-    return res.status(201).json({ session })
+    const session = await startMissionSession(req.user.id, req.missionId);
+    return res.status(201).json({ session });
   } catch (error) {
-    return handleSessionError(error, res, 'Unable to start mission session')
+    return handleSessionError(error, res, "Unable to start mission session");
   }
 }
 
 async function pauseSession(req, res) {
   try {
-    const session = await pauseCurrentSession(req.user.id)
-    return res.json({ session })
+    const session = await pauseCurrentSession(req.user.id);
+    return res.json({ session });
   } catch (error) {
-    return handleSessionError(error, res, 'Unable to pause mission session')
+    return handleSessionError(error, res, "Unable to pause mission session");
   }
 }
 
 async function resumeSession(req, res) {
   try {
-    const session = await resumeCurrentSession(req.user.id)
-    return res.json({ session })
+    const session = await resumeCurrentSession(req.user.id);
+    return res.json({ session });
   } catch (error) {
-    return handleSessionError(error, res, 'Unable to resume mission session')
+    return handleSessionError(error, res, "Unable to resume mission session");
   }
 }
 
 async function completeSession(req, res) {
   try {
-    const session = await completeCurrentSession(req.user.id, req.sessionNotes)
-    return res.json({ session })
+    const session = await completeCurrentSession(req.user.id, req.sessionNotes);
+    res.json({ session });
+    // Fire achievement check after response — non-blocking
+    checkAndUnlockAchievements(req.user.id).catch((err) =>
+      console.error("Achievement check failed after session complete:", err),
+    );
   } catch (error) {
-    return handleSessionError(error, res, 'Unable to complete mission session')
+    return handleSessionError(error, res, "Unable to complete mission session");
   }
 }
 
 async function abandonSession(req, res) {
   try {
-    const session = await abandonCurrentSession(req.user.id, req.sessionNotes)
-    return res.json({ session })
+    const session = await abandonCurrentSession(req.user.id, req.sessionNotes);
+    res.json({ session });
+    // Fire achievement check after response — non-blocking
+    checkAndUnlockAchievements(req.user.id).catch((err) =>
+      console.error("Achievement check failed after session abandon:", err),
+    );
   } catch (error) {
-    return handleSessionError(error, res, 'Unable to abandon mission session')
+    return handleSessionError(error, res, "Unable to abandon mission session");
   }
 }
 
@@ -88,4 +107,4 @@ module.exports = {
   resumeSession,
   sessionHistory,
   startSession,
-}
+};

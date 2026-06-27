@@ -1,38 +1,45 @@
-const prisma = require('../config/prisma')
-const { getConsumptionSummary } = require('./consumptionService')
-const { getStreakSummary } = require('./streakService')
+const prisma = require("../config/prisma");
+const { getConsumptionSummary } = require("./consumptionService");
+const { getStreakSummary } = require("./streakService");
 
 const rankBands = [
-  { rank: 'D', min: 0, max: 199 },
-  { rank: 'C', min: 200, max: 399 },
-  { rank: 'B', min: 400, max: 699 },
-  { rank: 'A', min: 700, max: 999 },
-  { rank: 'S', min: 1000, max: 1499 },
-  { rank: 'S+', min: 1500, max: null },
-]
+  { rank: "D", min: 0, max: 199 },
+  { rank: "C", min: 200, max: 399 },
+  { rank: "B", min: 400, max: 699 },
+  { rank: "A", min: 700, max: 999 },
+  { rank: "S", min: 1000, max: 1499 },
+  { rank: "S+", min: 1500, max: null },
+];
 
 const sourceLabels = {
-  BLOCK_RESISTANCE: 'Distraction Resistance',
-  FOCUS_DURATION: 'Focus Duration',
-  HEALTHY_CONSUMPTION: 'Healthy Consumption',
-  MANUAL_RECALCULATION: 'Manual Recalculation',
-  MISSION_ABANDONED: 'Failed Missions',
-  MISSION_COMPLETION: 'Mission Completion',
-  STREAK_BONUS: 'Streak Strength',
-}
+  ACHIEVEMENT_UNLOCK: "Achievement Unlocked",
+  BLOCK_RESISTANCE: "Distraction Resistance",
+  FOCUS_DURATION: "Focus Duration",
+  HEALTHY_CONSUMPTION: "Healthy Consumption",
+  MANUAL_RECALCULATION: "Manual Recalculation",
+  MISSION_ABANDONED: "Failed Missions",
+  MISSION_COMPLETION: "Mission Completion",
+  STREAK_BONUS: "Streak Strength",
+};
 
 function rankForXp(totalXp) {
-  const currentXp = Math.max(0, totalXp)
-  const index = rankBands.findIndex((band) => currentXp >= band.min && (band.max === null || currentXp <= band.max))
-  const currentBand = rankBands[index] || rankBands[0]
-  const nextBand = rankBands[index + 1] || null
-  const xpForCurrentRank = currentBand.min
-  const xpForNextRank = nextBand ? nextBand.min : currentBand.min
-  const xpNeeded = nextBand ? Math.max(0, nextBand.min - currentXp) : 0
-  const rankSpan = nextBand ? nextBand.min - currentBand.min : 1
+  const currentXp = Math.max(0, totalXp);
+  const index = rankBands.findIndex(
+    (band) =>
+      currentXp >= band.min && (band.max === null || currentXp <= band.max),
+  );
+  const currentBand = rankBands[index] || rankBands[0];
+  const nextBand = rankBands[index + 1] || null;
+  const xpForCurrentRank = currentBand.min;
+  const xpForNextRank = nextBand ? nextBand.min : currentBand.min;
+  const xpNeeded = nextBand ? Math.max(0, nextBand.min - currentXp) : 0;
+  const rankSpan = nextBand ? nextBand.min - currentBand.min : 1;
   const progressPercentage = nextBand
-    ? Math.min(100, Math.round(((currentXp - currentBand.min) / rankSpan) * 100))
-    : 100
+    ? Math.min(
+        100,
+        Math.round(((currentXp - currentBand.min) / rankSpan) * 100),
+      )
+    : 100;
 
   return {
     currentRank: currentBand.rank,
@@ -42,44 +49,61 @@ function rankForXp(totalXp) {
     xpForCurrentRank,
     xpForNextRank,
     xpNeeded,
-  }
+  };
 }
 
 function topPercentText(totalXp) {
-  if (totalXp >= 1500) return 'Top 1%'
-  if (totalXp >= 1000) return 'Top 5%'
-  if (totalXp >= 700) return 'Top 12%'
-  if (totalXp >= 400) return 'Top 25%'
-  if (totalXp >= 200) return 'Top 45%'
-  return 'Building baseline'
+  if (totalXp >= 1500) return "Top 1%";
+  if (totalXp >= 1000) return "Top 5%";
+  if (totalXp >= 700) return "Top 12%";
+  if (totalXp >= 400) return "Top 25%";
+  if (totalXp >= 200) return "Top 45%";
+  return "Building baseline";
 }
 
 function safeDateKey(date = new Date()) {
-  return date.toISOString().slice(0, 10)
+  return date.toISOString().slice(0, 10);
 }
 
 function eventMetadata(session) {
   return {
-    durationMinutes: session.actualDurationMinutes || Math.max(0, Math.round((session.elapsedSeconds || 0) / 60)),
+    durationMinutes:
+      session.actualDurationMinutes ||
+      Math.max(0, Math.round((session.elapsedSeconds || 0) / 60)),
     missionId: session.missionId,
     missionSessionId: session.id,
-    missionTitle: session.mission?.title || 'Mission',
-  }
+    missionTitle: session.mission?.title || "Mission",
+  };
 }
 
 function focusDurationPoints(session) {
-  const durationMinutes = session.actualDurationMinutes || Math.max(0, Math.floor((session.elapsedSeconds || 0) / 60))
-  return Math.floor(durationMinutes / 25) * 10
+  const durationMinutes =
+    session.actualDurationMinutes ||
+    Math.max(0, Math.floor((session.elapsedSeconds || 0) / 60));
+  return Math.floor(durationMinutes / 25) * 10;
 }
 
 async function syncScoreFromEvents(userId, tx = prisma) {
-  const events = await tx.disciplineScoreEvent.findMany({
-    where: { userId },
-    select: { points: true },
-  })
-  const totalXp = Math.max(0, events.reduce((sum, event) => sum + event.points, 0))
-  const rank = rankForXp(totalXp)
-  const now = new Date()
+  const [events, completedUserAchievements] = await Promise.all([
+    tx.disciplineScoreEvent.findMany({
+      where: { userId },
+      select: { points: true },
+    }),
+    tx.userAchievement.findMany({
+      where: { userId, completed: true },
+      include: { achievement: { select: { xpReward: true } } },
+    }),
+  ]);
+  const achievementXp = completedUserAchievements.reduce(
+    (sum, ua) => sum + ua.achievement.xpReward,
+    0,
+  );
+  const totalXp = Math.max(
+    0,
+    events.reduce((sum, event) => sum + event.points, 0) + achievementXp,
+  );
+  const rank = rankForXp(totalXp);
+  const now = new Date();
 
   const score = await tx.disciplineScore.upsert({
     create: {
@@ -98,7 +122,7 @@ async function syncScoreFromEvents(userId, tx = prisma) {
       totalXp,
     },
     where: { userId },
-  })
+  });
 
   await tx.disciplineScoreSnapshot.upsert({
     create: {
@@ -117,34 +141,34 @@ async function syncScoreFromEvents(userId, tx = prisma) {
         userId,
       },
     },
-  })
+  });
 
-  return { score, rank }
+  return { score, rank };
 }
 
 async function createSessionScoreEvents(tx, session) {
-  const metadata = eventMetadata(session)
+  const metadata = eventMetadata(session);
 
-  if (session.status === 'COMPLETED') {
+  if (session.status === "COMPLETED") {
     await tx.disciplineScoreEvent.upsert({
       create: {
         description: `Completed ${metadata.missionTitle}`,
         metadata,
         missionSessionId: session.id,
         points: 25,
-        source: 'MISSION_COMPLETION',
+        source: "MISSION_COMPLETION",
         userId: session.userId,
       },
       update: {},
       where: {
         source_missionSessionId: {
           missionSessionId: session.id,
-          source: 'MISSION_COMPLETION',
+          source: "MISSION_COMPLETION",
         },
       },
-    })
+    });
 
-    const focusPoints = focusDurationPoints(session)
+    const focusPoints = focusDurationPoints(session);
     if (focusPoints > 0) {
       await tx.disciplineScoreEvent.upsert({
         create: {
@@ -152,20 +176,20 @@ async function createSessionScoreEvents(tx, session) {
           metadata,
           missionSessionId: session.id,
           points: focusPoints,
-          source: 'FOCUS_DURATION',
+          source: "FOCUS_DURATION",
           userId: session.userId,
         },
         update: {},
         where: {
           source_missionSessionId: {
             missionSessionId: session.id,
-            source: 'FOCUS_DURATION',
+            source: "FOCUS_DURATION",
           },
         },
-      })
+      });
     }
 
-    const resistancePoints = session.blockedWebsitesCount || 0
+    const resistancePoints = session.blockedWebsitesCount || 0;
     if (resistancePoints > 0) {
       await tx.disciplineScoreEvent.upsert({
         create: {
@@ -173,38 +197,38 @@ async function createSessionScoreEvents(tx, session) {
           metadata: { ...metadata, blockedWebsitesCount: resistancePoints },
           missionSessionId: session.id,
           points: resistancePoints,
-          source: 'BLOCK_RESISTANCE',
+          source: "BLOCK_RESISTANCE",
           userId: session.userId,
         },
         update: {},
         where: {
           source_missionSessionId: {
             missionSessionId: session.id,
-            source: 'BLOCK_RESISTANCE',
+            source: "BLOCK_RESISTANCE",
           },
         },
-      })
+      });
     }
   }
 
-  if (session.status === 'ABANDONED') {
+  if (session.status === "ABANDONED") {
     await tx.disciplineScoreEvent.upsert({
       create: {
         description: `Abandoned ${metadata.missionTitle}`,
         metadata,
         missionSessionId: session.id,
         points: -10,
-        source: 'MISSION_ABANDONED',
+        source: "MISSION_ABANDONED",
         userId: session.userId,
       },
       update: {},
       where: {
         source_missionSessionId: {
           missionSessionId: session.id,
-          source: 'MISSION_ABANDONED',
+          source: "MISSION_ABANDONED",
         },
       },
-    })
+    });
   }
 }
 
@@ -212,70 +236,71 @@ async function rebuildScoreForUser(userId) {
   const [sessions, streak, consumption] = await Promise.all([
     prisma.missionSession.findMany({
       include: { mission: true },
-      orderBy: { endedAt: 'asc' },
+      orderBy: { endedAt: "asc" },
       where: {
-        status: { in: ['COMPLETED', 'ABANDONED'] },
+        status: { in: ["COMPLETED", "ABANDONED"] },
         userId,
       },
     }),
     getStreakSummary(userId),
     getConsumptionSummary(userId),
-  ])
+  ]);
 
   return prisma.$transaction(async (tx) => {
-    await tx.disciplineScoreEvent.deleteMany({ where: { userId } })
+    await tx.disciplineScoreEvent.deleteMany({ where: { userId } });
 
     for (const session of sessions) {
-      await createSessionScoreEvents(tx, session)
+      await createSessionScoreEvents(tx, session);
     }
 
-    const streakPoints = ((streak.currentStreak || 0) * 5) + ((streak.bestStreak || 0) * 2)
+    const streakPoints =
+      (streak.currentStreak || 0) * 5 + (streak.bestStreak || 0) * 2;
     if (streakPoints > 0) {
       await tx.disciplineScoreEvent.create({
         data: {
-          description: 'Current and best streak discipline bonus',
+          description: "Current and best streak discipline bonus",
           metadata: {
             bestStreak: streak.bestStreak || 0,
             currentStreak: streak.currentStreak || 0,
           },
           points: streakPoints,
-          source: 'STREAK_BONUS',
+          source: "STREAK_BONUS",
           userId,
         },
-      })
+      });
     }
 
     if (sessions.length > 0 && consumption.dailyConsumptionScore >= 80) {
       await tx.disciplineScoreEvent.create({
         data: {
-          description: 'Healthy consumption maintained',
+          description: "Healthy consumption maintained",
           metadata: {
             consumptionScore: consumption.dailyConsumptionScore,
             statusText: consumption.statusText,
           },
           points: 75,
-          source: 'HEALTHY_CONSUMPTION',
+          source: "HEALTHY_CONSUMPTION",
           userId,
         },
-      })
+      });
     }
 
-    const result = await syncScoreFromEvents(userId, tx)
-    return formatScore(result.score)
-  })
+    const result = await syncScoreFromEvents(userId, tx);
+    return formatScore(result.score);
+  });
 }
 
 async function recordMissionSessionScore(session) {
   await prisma.$transaction(async (tx) => {
-    await createSessionScoreEvents(tx, session)
-  })
+    await createSessionScoreEvents(tx, session);
+  });
 
-  return rebuildScoreForUser(session.userId)
+  return rebuildScoreForUser(session.userId);
 }
 
 function formatScore(scoreRecord) {
-  const totalXp = scoreRecord?.totalXp || 0
-  const rank = rankForXp(totalXp)
+  const totalXp = scoreRecord?.totalXp || 0;
+  const rank = rankForXp(totalXp);
 
   return {
     ...rank,
@@ -283,61 +308,91 @@ function formatScore(scoreRecord) {
     progressToNextRank: rank.progressPercentage,
     topPercentText: topPercentText(totalXp),
     totalXp,
-  }
+  };
 }
 
 async function ensureScore(userId) {
-  const score = await prisma.disciplineScore.findUnique({ where: { userId } })
+  const score = await prisma.disciplineScore.findUnique({ where: { userId } });
 
   if (score) {
-    return score
+    return score;
   }
 
-  return rebuildScoreForUser(userId)
+  return rebuildScoreForUser(userId);
 }
 
 async function getDisciplineScore(userId) {
-  const score = await ensureScore(userId)
-  return formatScore(score)
+  const score = await ensureScore(userId);
+  return formatScore(score);
 }
 
 async function getScoreBreakdown(userId) {
-  await ensureScore(userId)
-  const groups = await prisma.disciplineScoreEvent.groupBy({
-    _sum: { points: true },
-    by: ['source'],
-    where: { userId },
-  })
-  const totalPositive = groups
-    .filter((group) => (group._sum.points || 0) > 0)
-    .reduce((sum, group) => sum + (group._sum.points || 0), 0)
+  await ensureScore(userId);
+  const [groups, completedUserAchievements] = await Promise.all([
+    prisma.disciplineScoreEvent.groupBy({
+      _sum: { points: true },
+      by: ["source"],
+      where: { userId },
+    }),
+    prisma.userAchievement.findMany({
+      where: { userId, completed: true },
+      include: { achievement: { select: { xpReward: true } } },
+    }),
+  ]);
+  const achievementXp = completedUserAchievements.reduce(
+    (sum, ua) => sum + ua.achievement.xpReward,
+    0,
+  );
+  const totalPositive =
+    groups
+      .filter((group) => (group._sum.points || 0) > 0)
+      .reduce((sum, group) => sum + (group._sum.points || 0), 0) +
+    Math.max(0, achievementXp);
   const orderedSources = [
-    'MISSION_COMPLETION',
-    'FOCUS_DURATION',
-    'STREAK_BONUS',
-    'BLOCK_RESISTANCE',
-    'HEALTHY_CONSUMPTION',
-    'MISSION_ABANDONED',
-  ]
+    "MISSION_COMPLETION",
+    "FOCUS_DURATION",
+    "STREAK_BONUS",
+    "BLOCK_RESISTANCE",
+    "HEALTHY_CONSUMPTION",
+    "ACHIEVEMENT_UNLOCK",
+    "MISSION_ABANDONED",
+  ];
 
-  return orderedSources.map((source) => {
-    const points = groups.find((group) => group.source === source)?._sum.points || 0
+  const rows = orderedSources.map((source) => {
+    if (source === "ACHIEVEMENT_UNLOCK") {
+      return {
+        label: sourceLabels[source],
+        percentage:
+          achievementXp > 0 && totalPositive > 0
+            ? Math.round((achievementXp / totalPositive) * 100)
+            : 0,
+        points: achievementXp,
+        source,
+      };
+    }
+    const points =
+      groups.find((group) => group.source === source)?._sum.points || 0;
     return {
       label: sourceLabels[source],
-      percentage: points > 0 && totalPositive > 0 ? Math.round((points / totalPositive) * 100) : 0,
+      percentage:
+        points > 0 && totalPositive > 0
+          ? Math.round((points / totalPositive) * 100)
+          : 0,
       points,
       source,
-    }
-  })
+    };
+  });
+
+  return rows;
 }
 
 async function getScoreEvents(userId) {
-  await ensureScore(userId)
+  await ensureScore(userId);
   const events = await prisma.disciplineScoreEvent.findMany({
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
     take: 50,
     where: { userId },
-  })
+  });
 
   return events.map((event) => ({
     createdAt: event.createdAt,
@@ -347,35 +402,37 @@ async function getScoreEvents(userId) {
     points: event.points,
     source: event.source,
     sourceLabel: sourceLabels[event.source] || event.source,
-  }))
+  }));
 }
 
 async function getScoreTrend(userId) {
-  await ensureScore(userId)
-  const today = new Date(`${safeDateKey()}T00:00:00.000Z`)
-  const start = new Date(today)
-  start.setUTCDate(start.getUTCDate() - 6)
+  await ensureScore(userId);
+  const today = new Date(`${safeDateKey()}T00:00:00.000Z`);
+  const start = new Date(today);
+  start.setUTCDate(start.getUTCDate() - 6);
   const snapshots = await prisma.disciplineScoreSnapshot.findMany({
-    orderBy: { date: 'asc' },
+    orderBy: { date: "asc" },
     where: {
       date: { gte: start, lte: today },
       userId,
     },
-  })
-  const byDate = new Map(snapshots.map((snapshot) => [safeDateKey(snapshot.date), snapshot]))
+  });
+  const byDate = new Map(
+    snapshots.map((snapshot) => [safeDateKey(snapshot.date), snapshot]),
+  );
 
   return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(start)
-    date.setUTCDate(start.getUTCDate() + index)
-    const key = safeDateKey(date)
-    const snapshot = byDate.get(key)
+    const date = new Date(start);
+    date.setUTCDate(start.getUTCDate() + index);
+    const key = safeDateKey(date);
+    const snapshot = byDate.get(key);
 
     return {
       date: key,
-      rank: snapshot?.rank || 'D',
+      rank: snapshot?.rank || "D",
       score: snapshot?.score || 0,
-    }
-  })
+    };
+  });
 }
 
 module.exports = {
@@ -386,4 +443,4 @@ module.exports = {
   rankForXp,
   rebuildScoreForUser,
   recordMissionSessionScore,
-}
+};
