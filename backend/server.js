@@ -22,15 +22,21 @@ const streakRoutes = require("./src/routes/streakRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const defaultOrigins = ["http://127.0.0.1:5173", "http://localhost:5173"];
-const allowedOrigins = (
-  process.env.CLIENT_ORIGINS ||
-  process.env.CLIENT_ORIGIN ||
-  defaultOrigins.join(",")
-)
-  .split(",")
+const defaultOrigins = [
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+  "http://127.0.0.1:5174",
+  "http://localhost:5174",
+];
+const configuredOrigins = [
+  process.env.CLIENT_ORIGINS,
+  process.env.CLIENT_ORIGIN,
+]
+  .filter(Boolean)
+  .flatMap((origins) => origins.split(","))
   .map((origin) => origin.trim())
   .filter(Boolean);
+const allowedOrigins = [...new Set([...defaultOrigins, ...configuredOrigins])];
 
 app.use(
   cors({
@@ -83,6 +89,10 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Dopamine Lock backend running on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Dopamine Lock backend running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
