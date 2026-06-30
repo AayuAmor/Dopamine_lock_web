@@ -454,6 +454,7 @@ module.exports = {
   getLogs,
   getPlatformUsage,
   getTimeline,
+  refreshDailySummary,
   getUserLimits,
   getWeeklyAnalytics,
   updateLimits,

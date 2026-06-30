@@ -65,6 +65,12 @@ enum ConsumptionLogSource {
   IMPORTED
 }
 
+enum BlockedAttemptSource {
+  EXTENSION
+  WEB
+  SYSTEM
+}
+
 enum GoalCategory {
   STUDY
   CODING
@@ -135,6 +141,8 @@ model User {
   userAchievements          UserAchievement[]
   userIdentity              UserIdentity?
   identitySnapshots         IdentitySnapshot[]
+  extensionStatus           ExtensionStatus?
+  blockedAttempts           BlockedAttempt[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
@@ -310,6 +318,7 @@ model MissionSession {
   user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   mission                Mission                @relation(fields: [missionId], references: [id], onDelete: Cascade)
   disciplineScoreEvents  DisciplineScoreEvent[]
+  blockedAttempts        BlockedAttempt[]
 
   @@index([userId], map: "idx_mission_sessions_user_id")
   @@index([missionId], map: "idx_mission_sessions_mission_id")
@@ -318,6 +327,42 @@ model MissionSession {
   @@index([userId, endedAt], map: "idx_mission_sessions_user_ended_at")
   @@index([userId, completedAt], map: "idx_mission_sessions_user_completed_at")
   @@map("mission_sessions")
+}
+
+model ExtensionStatus {
+  id               Int       @id @default(autoincrement())
+  userId           Int       @unique @map("user_id")
+  browser          String?   @db.VarChar(80)
+  extensionVersion String?   @map("extension_version") @db.VarChar(40)
+  installed        Boolean   @default(false)
+  enabled          Boolean   @default(false)
+  lastSyncAt       DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_extension_statuses_user_id")
+  @@map("extension_statuses")
+}
+
+model BlockedAttempt {
+  id               Int                  @id @default(autoincrement())
+  userId           Int                  @map("user_id")
+  missionSessionId Int?                 @map("mission_session_id")
+  domain           String               @db.VarChar(255)
+  url              String               @db.VarChar(2048)
+  pageTitle        String?              @map("page_title") @db.VarChar(500)
+  reason           String               @db.VarChar(500)
+  source           BlockedAttemptSource @default(EXTENSION)
+  attemptedAt      DateTime             @default(now()) @map("attempted_at") @db.Timestamptz(6)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missionSession   MissionSession?      @relation(fields: [missionSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, attemptedAt], map: "idx_blocked_attempts_user_attempted_at")
+  @@index([userId, domain], map: "idx_blocked_attempts_user_domain")
+  @@index([missionSessionId], map: "idx_blocked_attempts_session_id")
+  @@map("blocked_attempts")
 }
 
 model BlockRule {
